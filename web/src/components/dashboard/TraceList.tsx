@@ -1,0 +1,377 @@
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  Box,
+  Typography,
+  Paper,
+  Collapse,
+  Chip,
+} from "@mui/material";
+import { KeyboardArrowDown, KeyboardArrowRight } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import type { Trace } from "../../types/trace";
+import { customScrollbar } from "../../styles/CustomScrollBar";
+import React from "react";
+
+interface TraceListProps {
+  traces: Trace[];
+}
+
+const StatusChip: React.FC<{ status: string; secondary?: boolean }> = ({
+  status,
+  secondary = false,
+}) => (
+  <Chip
+    label={status.toUpperCase()}
+    size="small"
+    sx={{
+      fontWeight: 600,
+      fontSize: "0.75rem",
+      borderRadius: "1rem",
+      color: status === "success" ? "#155724" : "#721c24",
+      backgroundColor: status === "success" ? "#e9f4ea" : "#fbe9eb",
+      border: status === "success" ? "1px solid #34c759" : "1px solid #ff4d4f",
+      minWidth: 100,
+      textAlign: "center",
+      opacity: secondary ? 0.7 : 1,
+    }}
+  />
+);
+
+const TraceList: React.FC<TraceListProps> = ({ traces }) => {
+  const nav = useNavigate();
+  const [expandedTraces, setExpandedTraces] = useState<Set<string>>(new Set());
+
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+  };
+
+  const getTraceStartTime = (trace: Trace): string => {
+    if (trace.spans.length === 0) return trace.created_at;
+    const startTimes = trace.spans.map((span) =>
+      new Date(span.start_time).getTime(),
+    );
+    return new Date(Math.min(...startTimes)).toISOString();
+  };
+
+  const getTraceDuration = (trace: Trace): number => {
+    if (trace.spans.length === 0) return 0;
+    const spanTimes = trace.spans.map((span) => ({
+      start: new Date(span.start_time).getTime(),
+      end: new Date(span.end_time).getTime(),
+    }));
+    const start = Math.min(...spanTimes.map((t) => t.start));
+    const end = Math.max(...spanTimes.map((t) => t.end));
+    return (end - start) / 1000;
+  };
+
+  const getTraceStatus = (trace: Trace): "success" | "error" => {
+    const hasError = trace.spans.some(
+      (span) => span.attributes["otel.status_code"] === "ERROR",
+    );
+    return hasError ? "error" : "success";
+  };
+
+  const getSpanStatus = (span: any): "success" | "error" => {
+    return span.attributes["otel.status_code"] === "ERROR"
+      ? "error"
+      : "success";
+  };
+
+  const toggleTrace = (traceId: string) => {
+    setExpandedTraces((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(traceId)) {
+        newSet.delete(traceId);
+      } else {
+        newSet.add(traceId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSpanClick = (
+    traceId: string,
+    spanId: string,
+    e: React.MouseEvent,
+  ) => {
+    e.stopPropagation();
+    nav(`/trace/${traceId}?span=${spanId}`);
+  };
+
+  const handleTraceClick = (traceId: string) => {
+    nav(`/trace/${traceId}`);
+  };
+
+  return (
+    <TableContainer
+      component={Paper}
+      sx={{
+        border: "1px solid",
+        borderColor: "divider",
+        height: "100%",
+        ...customScrollbar,
+      }}
+    >
+      <Table>
+        <TableHead>
+          <TableRow
+            sx={{
+              bgcolor: "background.default",
+              position: "sticky",
+              top: 0,
+              zIndex: 1,
+            }}
+          >
+            <TableCell sx={{ width: "2%", fontWeight: 600 }}></TableCell>
+            <TableCell sx={{ width: "15%", fontWeight: 600 }}>
+              Timestamp
+            </TableCell>
+            <TableCell sx={{ width: "20%", fontWeight: 600 }}>
+              Trace ID
+            </TableCell>
+            <TableCell sx={{ width: "20%", fontWeight: 600 }}>Status</TableCell>
+            <TableCell sx={{ width: "20%", fontWeight: 600 }}>
+              Duration
+            </TableCell>
+            <TableCell sx={{ width: "20%", fontWeight: 600 }}>
+              Episode ID
+            </TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {traces.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} sx={{ textAlign: "center", py: 4 }}>
+                No traces found.
+              </TableCell>
+            </TableRow>
+          ) : (
+            traces.map((trace) => {
+              const isExpanded = expandedTraces.has(trace.trace_id);
+              const startTime = getTraceStartTime(trace);
+              const duration = getTraceDuration(trace);
+              const status = getTraceStatus(trace);
+
+              return (
+                <React.Fragment key={trace.trace_id}>
+                  <TableRow
+                    sx={{
+                      cursor: "pointer",
+                      "&:hover": { bgcolor: "action.hover" },
+                    }}
+                  >
+                    <TableCell sx={{ p: 1 }}>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTrace(trace.trace_id);
+                        }}
+                      >
+                        {isExpanded ? (
+                          <KeyboardArrowDown />
+                        ) : (
+                          <KeyboardArrowRight />
+                        )}
+                      </IconButton>
+                    </TableCell>
+                    <TableCell
+                      onClick={() => handleTraceClick(trace.trace_id)}
+                      sx={{ p: 2 }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}
+                      >
+                        {formatDateTime(startTime)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell
+                      onClick={() => handleTraceClick(trace.trace_id)}
+                      sx={{ p: 2 }}
+                    >
+                      <Typography variant="body2">{trace.trace_id}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {trace.spans.length} span(s)
+                      </Typography>
+                    </TableCell>
+                    <TableCell
+                      onClick={() => handleTraceClick(trace.trace_id)}
+                      sx={{ p: 2 }}
+                    >
+                      <StatusChip status={status} />
+                    </TableCell>
+                    <TableCell
+                      onClick={() => handleTraceClick(trace.trace_id)}
+                      sx={{ p: 2 }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ fontFamily: "monospace" }}
+                      >
+                        {duration.toFixed(2)}s
+                      </Typography>
+                    </TableCell>
+                    <TableCell
+                      onClick={() => handleTraceClick(trace.trace_id)}
+                      sx={{ p: 2 }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontFamily: "monospace",
+                          fontSize: "0.75rem",
+                          color: "text.secondary",
+                        }}
+                      >
+                        {trace.attributes["toolbrain.episode.id"]}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell sx={{ p: 0, border: 0 }} colSpan={6}>
+                      <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                        <Box sx={{ bgcolor: "action.hover", py: 1 }}>
+                          <Table
+                            size="small"
+                            sx={{ width: "100%", tableLayout: "fixed" }}
+                          >
+                            <colgroup>
+                              <col style={{ width: "2%" }} />
+                              <col style={{ width: "15%" }} />
+                              <col style={{ width: "20%" }} />
+                              <col style={{ width: "20%" }} />
+                              <col style={{ width: "20%" }} />
+                              <col style={{ width: "20%" }} />
+                            </colgroup>
+                            <TableBody>
+                              {trace.spans.map((span) => {
+                                const spanDuration = (
+                                  (new Date(span.end_time).getTime() -
+                                    new Date(span.start_time).getTime()) /
+                                  1000
+                                ).toFixed(2);
+                                const spanStatus = getSpanStatus(span);
+
+                                return (
+                                  <TableRow
+                                    key={span.span_id}
+                                    onClick={(e) =>
+                                      handleSpanClick(
+                                        trace.trace_id,
+                                        span.span_id,
+                                        e,
+                                      )
+                                    }
+                                    sx={{
+                                      cursor: "pointer",
+                                      "&:hover": { bgcolor: "action.hover" },
+                                    }}
+                                  >
+                                    <TableCell sx={{ p: 2 }}></TableCell>
+                                    <TableCell sx={{ p: 2 }}>
+                                      <Typography
+                                        variant="body2"
+                                        sx={{
+                                          fontFamily: "monospace",
+                                          fontSize: "0.8rem",
+                                          color: "text.secondary",
+                                        }}
+                                      >
+                                        {formatDateTime(span.start_time)}
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell sx={{ p: 2 }}>
+                                      <Typography
+                                        variant="body2"
+                                        sx={{ fontSize: "0.875rem" }}
+                                      >
+                                        {span.name}
+                                      </Typography>
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{
+                                          display: "block",
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        {span.attributes[
+                                          "toolbrain.llm.completion"
+                                        ] ??
+                                          span.attributes[
+                                            "toolbrain.tool.output"
+                                          ] ??
+                                          ""}
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell sx={{ p: 2 }}>
+                                      <StatusChip
+                                        status={spanStatus}
+                                        secondary
+                                      />
+                                    </TableCell>
+                                    <TableCell sx={{ p: 2 }}>
+                                      <Typography
+                                        variant="body2"
+                                        sx={{
+                                          fontFamily: "monospace",
+                                          fontSize: "0.75rem",
+                                        }}
+                                      >
+                                        {spanDuration}s
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell sx={{ p: 2 }}>
+                                      <Typography
+                                        variant="body2"
+                                        sx={{
+                                          fontFamily: "monospace",
+                                          fontSize: "0.75rem",
+                                          color: "text.secondary",
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        {span.span_id}
+                                      </Typography>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </Box>
+                      </Collapse>
+                    </TableCell>
+                  </TableRow>
+                </React.Fragment>
+              );
+            })
+          )}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+};
+
+export default TraceList;

@@ -1,0 +1,12 @@
+{
+  "appearance": {
+    "theme": "dark"
+  },
+  "refresh": {
+    "autoRefresh": true,
+    "refreshInterval": 160
+  },
+  "llm": {
+    "model": "qwen-14b"
+  }
+}
