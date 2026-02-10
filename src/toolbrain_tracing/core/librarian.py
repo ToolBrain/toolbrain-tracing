@@ -13,6 +13,8 @@ import json
 import logging
 import re
 
+import sqlparse
+
 from toolbrain_tracing.config import settings
 from toolbrain_tracing.core.llm_providers import select_provider, is_provider_available
 
@@ -87,7 +89,15 @@ class LibrarianAgent:
             "Only write SELECT queries. "
             "If the SQL execution fails, correct the query and try again. "
             "If the tool returns EMPTY_RESULT, do NOT hallucinate. Instead, ask a clarifying question and return JSON with suggestions. "
-            "Always output a JSON object with keys: answer, suggestions, sources.\n\n"
+            "Return ONLY valid JSON matching this schema: "
+            "{"
+            "\"answer\": \"string\", "
+            "\"suggestions\": [{\"label\": \"string\", \"value\": \"string\"}], "
+            "\"sources\": [\"string\"]"
+            "}. "
+            "suggestions MUST be an array (can be empty). "
+            "sources MUST be an array (can be empty). "
+            "Do not include markdown or extra keys.\n\n"
             f"{SCHEMA_CONTEXT}"
         )
 
@@ -146,6 +156,37 @@ class LibrarianAgent:
             "sources": [],
         }
 
+    def _abstain_response_from_llm(self, user_query: str, history_text: str) -> Dict[str, Any]:
+        system_prompt = (
+            "You are the ToolBrain TraceStore Librarian. "
+            "The database returned EMPTY_RESULT. "
+            "Ask a clarifying question and provide helpful suggestions. "
+            "Return ONLY valid JSON with keys answer, suggestions, sources. "
+            "suggestions must be an array of objects with label/value strings. "
+            "sources must be an empty array."
+        )
+        user_content = (
+            "Conversation History:\n"
+            f"{history_text}\n\n"
+            "User Question:\n"
+            f"{user_query}\n\n"
+            "Return JSON only."
+        )
+        try:
+            session = self.provider.start_chat(system_prompt, [])
+            response = self.provider.send_user_message(session, user_content)
+            answer_text = self.provider.extract_text(response)
+            parsed = self._extract_json(answer_text)
+
+            answer = str(parsed.get("answer", "")).strip()
+            suggestions = self._normalize_suggestions(parsed.get("suggestions"))
+            if not answer:
+                raise ValueError("Empty abstain answer from LLM")
+
+            return {"answer": answer, "suggestions": suggestions, "sources": []}
+        except Exception:
+            return self._abstain_response()
+
     def _normalize_suggestions(self, suggestions: Any) -> List[Dict[str, str]]:
         if not isinstance(suggestions, list):
             return []
@@ -169,9 +210,16 @@ class LibrarianAgent:
                 return str(sql).strip()
         except Exception:
             pass
+        match = re.search(r"```(?:sql)?\s*(.*?)```", text, flags=re.IGNORECASE | re.DOTALL)
+        candidate = match.group(1).strip() if match else text
 
-        match = re.search(r"SELECT\s+.*", text, flags=re.IGNORECASE | re.DOTALL)
-        return match.group(0).strip() if match else None
+        statements = sqlparse.parse(candidate)
+        for statement in statements:
+            if statement.get_type() == "SELECT":
+                return str(statement).strip()
+
+        fallback = re.search(r"SELECT\s+.*", candidate, flags=re.IGNORECASE | re.DOTALL)
+        return fallback.group(0).strip() if fallback else None
 
     def query(self, user_query: str, session_id: str) -> Dict[str, Any]:
         """Process a natural language query using the configured provider."""
@@ -218,7 +266,7 @@ class LibrarianAgent:
                     prompt = f"SQL error: {tool_result}. Please fix and output a new SELECT query."
                     continue
                 if tool_result.startswith("EMPTY_RESULT"):
-                    result = self._abstain_response()
+                    result = self._abstain_response_from_llm(user_query, history_text)
                     self.store.save_chat_message(session_id, "assistant", result["answer"])
                     return result
 
@@ -271,7 +319,7 @@ class LibrarianAgent:
                 if tool_result.startswith("EXECUTION_FAILED"):
                     break
                 if tool_result.startswith("EMPTY_RESULT"):
-                    result = self._abstain_response()
+                    result = self._abstain_response_from_llm(user_query, history_text)
                     self.store.save_chat_message(session_id, "assistant", result["answer"])
                     return result
 
