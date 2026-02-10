@@ -13,6 +13,8 @@ import json
 import logging
 import re
 
+import sqlparse
+
 from toolbrain_tracing.config import settings
 from toolbrain_tracing.core.llm_providers import select_provider, is_provider_available
 
@@ -66,6 +68,20 @@ def _build_tool_specs() -> List[Dict[str, Any]]:
                 "required": ["query"],
             },
         }
+        ,
+        {
+            "name": "search_similar_traces",
+            "description": "Find semantically similar traces using vector search.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Semantic search query"},
+                    "min_rating": {"type": "integer", "description": "Minimum rating", "default": 4},
+                    "limit": {"type": "integer", "description": "Max results", "default": 3},
+                },
+                "required": ["query"],
+            },
+        }
     ]
 
 
@@ -84,10 +100,19 @@ class LibrarianAgent:
         return (
             "You are the ToolBrain TraceStore Librarian, a text-to-SQL assistant. "
             "Use the run_sql_query tool for ALL database access. "
+            "Use search_similar_traces for semantic similarity over trace content; use run_sql_query for metadata filters, counts, and exact matches. "
             "Only write SELECT queries. "
             "If the SQL execution fails, correct the query and try again. "
             "If the tool returns EMPTY_RESULT, do NOT hallucinate. Instead, ask a clarifying question and return JSON with suggestions. "
-            "Always output a JSON object with keys: answer, suggestions, sources.\n\n"
+            "Return ONLY valid JSON matching this schema: "
+            "{"
+            "\"answer\": \"string\", "
+            "\"suggestions\": [{\"label\": \"string\", \"value\": \"string\"}], "
+            "\"sources\": [\"string\"]"
+            "}. "
+            "suggestions MUST be an array (can be empty). "
+            "sources MUST be an array (can be empty). "
+            "Do not include markdown or extra keys.\n\n"
             f"{SCHEMA_CONTEXT}"
         )
 
@@ -146,6 +171,37 @@ class LibrarianAgent:
             "sources": [],
         }
 
+    def _abstain_response_from_llm(self, user_query: str, history_text: str) -> Dict[str, Any]:
+        system_prompt = (
+            "You are the ToolBrain TraceStore Librarian. "
+            "The database returned EMPTY_RESULT. "
+            "Ask a clarifying question and provide helpful suggestions. "
+            "Return ONLY valid JSON with keys answer, suggestions, sources. "
+            "suggestions must be an array of objects with label/value strings. "
+            "sources must be an empty array."
+        )
+        user_content = (
+            "Conversation History:\n"
+            f"{history_text}\n\n"
+            "User Question:\n"
+            f"{user_query}\n\n"
+            "Return JSON only."
+        )
+        try:
+            session = self.provider.start_chat(system_prompt, [])
+            response = self.provider.send_user_message(session, user_content)
+            answer_text = self.provider.extract_text(response)
+            parsed = self._extract_json(answer_text)
+
+            answer = str(parsed.get("answer", "")).strip()
+            suggestions = self._normalize_suggestions(parsed.get("suggestions"))
+            if not answer:
+                raise ValueError("Empty abstain answer from LLM")
+
+            return {"answer": answer, "suggestions": suggestions, "sources": []}
+        except Exception:
+            return self._abstain_response()
+
     def _normalize_suggestions(self, suggestions: Any) -> List[Dict[str, str]]:
         if not isinstance(suggestions, list):
             return []
@@ -169,9 +225,20 @@ class LibrarianAgent:
                 return str(sql).strip()
         except Exception:
             pass
+        match = re.search(r"```(?:sql)?\s*(.*?)```", text, flags=re.IGNORECASE | re.DOTALL)
+        candidate = match.group(1).strip() if match else text
 
-        match = re.search(r"SELECT\s+.*", text, flags=re.IGNORECASE | re.DOTALL)
-        return match.group(0).strip() if match else None
+        statements = sqlparse.parse(candidate)
+        for statement in statements:
+            if statement.get_type() == "SELECT":
+                return str(statement).strip()
+
+        fallback = re.search(r"SELECT\s+.*", candidate, flags=re.IGNORECASE | re.DOTALL)
+        return fallback.group(0).strip() if fallback else None
+
+    def search_similar_traces(self, query: str, min_rating: int = 4, limit: int = 3) -> str:
+        results = self.store.search_similar_experiences(query, min_rating=min_rating, limit=limit)
+        return json.dumps(results, default=str)
 
     def query(self, user_query: str, session_id: str) -> Dict[str, Any]:
         """Process a natural language query using the configured provider."""
@@ -218,7 +285,7 @@ class LibrarianAgent:
                     prompt = f"SQL error: {tool_result}. Please fix and output a new SELECT query."
                     continue
                 if tool_result.startswith("EMPTY_RESULT"):
-                    result = self._abstain_response()
+                    result = self._abstain_response_from_llm(user_query, history_text)
                     self.store.save_chat_message(session_id, "assistant", result["answer"])
                     return result
 
@@ -254,24 +321,40 @@ class LibrarianAgent:
                 break
 
             for call in tool_calls:
-                sql_query = (call.get("args") or {}).get("query", "")
-                tool_result = self.run_sql_query(sql_query)
-                self.store.save_chat_message(
-                    session_id,
-                    "tool",
-                    f"SQL: {sql_query}\nRESULT: {tool_result}",
-                )
+                tool_name = call.get("name")
+                args = call.get("args") or {}
+                if tool_name == "run_sql_query":
+                    sql_query = args.get("query", "")
+                    tool_result = self.run_sql_query(sql_query)
+                    self.store.save_chat_message(
+                        session_id,
+                        "tool",
+                        f"SQL: {sql_query}\nRESULT: {tool_result}",
+                    )
+                elif tool_name == "search_similar_traces":
+                    query = args.get("query", "")
+                    min_rating = int(args.get("min_rating", 4))
+                    limit = int(args.get("limit", 3))
+                    tool_result = self.search_similar_traces(query, min_rating=min_rating, limit=limit)
+                    self.store.save_chat_message(
+                        session_id,
+                        "tool",
+                        f"SEARCH: {query}\nRESULT: {tool_result}",
+                    )
+                else:
+                    tool_result = "UNKNOWN_TOOL"
+
                 response = self.provider.send_tool_result(
                     session,
-                    tool_name="run_sql_query",
+                    tool_name=tool_name,
                     tool_result=tool_result,
                     tool_call_id=call.get("id"),
                 )
 
-                if tool_result.startswith("EXECUTION_FAILED"):
+                if tool_name == "run_sql_query" and tool_result.startswith("EXECUTION_FAILED"):
                     break
-                if tool_result.startswith("EMPTY_RESULT"):
-                    result = self._abstain_response()
+                if tool_name == "run_sql_query" and tool_result.startswith("EMPTY_RESULT"):
+                    result = self._abstain_response_from_llm(user_query, history_text)
                     self.store.save_chat_message(session_id, "assistant", result["answer"])
                     return result
 

@@ -64,8 +64,8 @@ HOST=0.0.0.0
 PORT=8000
 LOG_LEVEL=info
 
-# Optional: Gemini AI
-GEMINI_API_KEY=your_key_here
+# Optional: 
+LLM_API_KEY=your_key_here
 ```
 
 ## 📊 Services

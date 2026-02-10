@@ -17,11 +17,18 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import logging
 import uuid
+import json
 
 from fastapi import APIRouter, HTTPException, Query, status
+from fastapi.responses import Response
 from pydantic import BaseModel, Field, field_serializer
 
+from sqlalchemy import func, cast, Integer
+from sqlalchemy.dialects.postgresql import JSONB
+
 from ...core.store import TraceStore
+from ...core.curator import CurriculumCurator
+from ...db.base import TraceStatus, CurriculumTask, Trace
 from ...evaluators.judge_agent import AIJudge
 from ...core.librarian import LibrarianAgent, LIBRARIAN_AVAILABLE
 from ...config import settings
@@ -243,6 +250,40 @@ class AIEvaluationOut(BaseModel):
     feedback: str = Field(..., description="AI judge feedback")
 
 
+class TraceSignalIn(BaseModel):
+    reason: str = Field(..., description="Issue description (looping, low confidence, etc.)")
+
+
+class ExperienceSearchOut(BaseModel):
+    trace_id: str
+    score: Optional[float] = None
+    rating: Optional[int] = None
+    feedback: Optional[Dict[str, Any]] = None
+    created_at: datetime
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, dt: datetime, _info) -> str:
+        return dt.isoformat()
+
+
+class ExperienceSearchResponse(BaseModel):
+    total: int
+    results: List[ExperienceSearchOut]
+
+
+class CurriculumTaskOut(BaseModel):
+    id: int
+    task_description: str
+    reasoning: str
+    status: str
+    priority: str
+    created_at: datetime
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, dt: datetime, _info) -> str:
+        return dt.isoformat()
+
+
 # Request models for trace ingestion
 class SpanIn(BaseModel):
     span_id: str = Field(..., description="Unique span identifier")
@@ -371,6 +412,71 @@ def list_traces(
         )
 
 
+@router.get("/traces/search", response_model=ExperienceSearchResponse, tags=["Traces"])
+def search_traces(
+    text: str = Query(..., description="Natural language search text"),
+    min_rating: int = Query(4, ge=1, le=5, description="Minimum rating threshold"),
+    limit: int = Query(3, ge=1, le=20, description="Maximum number of results"),
+):
+    """Search for similar high-quality traces using vector similarity."""
+    try:
+        results = store.search_similar_experiences(text, min_rating=min_rating, limit=limit)
+        return ExperienceSearchResponse(total=len(results), results=results)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to search traces: {str(e)}")
+
+
+@router.get("/export/traces", tags=["Export"])
+def export_traces(
+    min_rating: int = Query(4, ge=1, le=5, description="Minimum rating threshold"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of traces"),
+    format: str = Query("json", description="Export format: 'json' or 'jsonl'"),
+):
+    """Export high-quality traces as OTLP payloads."""
+    format_value = format.lower().strip()
+    if format_value not in {"json", "jsonl"}:
+        raise HTTPException(status_code=400, detail="Invalid format. Use 'json' or 'jsonl'.")
+    session = store.get_session()
+    try:
+        results: List[Dict[str, Any]] = []
+        if settings.is_postgres:
+            rating_value = cast(
+                func.jsonb_extract_path_text(cast(Trace.feedback, JSONB), "rating"),
+                Integer,
+            )
+            trace_rows = (
+                session.query(Trace)
+                .filter(Trace.feedback.isnot(None))
+                .filter(rating_value >= min_rating)
+                .order_by(Trace.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+        else:
+            trace_rows = session.query(Trace).order_by(Trace.created_at.desc()).all()
+            filtered = []
+            for trace in trace_rows:
+                rating = None
+                if trace.feedback and isinstance(trace.feedback, dict):
+                    rating = trace.feedback.get("rating")
+                if isinstance(rating, int) and rating >= min_rating:
+                    filtered.append(trace)
+            trace_rows = filtered[:limit]
+
+        for trace in trace_rows:
+            otlp = store.get_full_trace(trace.id)
+            if otlp:
+                results.append(otlp)
+
+        if format_value == "jsonl":
+            jsonl_content = "\n".join(json.dumps(item) for item in results)
+            return Response(content=jsonl_content, media_type="application/x-jsonlines")
+
+        return results
+    finally:
+        session.close()
+
+
 @router.get("/traces/{trace_id}", response_model=TraceOut, tags=["Traces"])
 def get_trace(trace_id: str):
     """
@@ -466,6 +572,85 @@ def add_feedback(trace_id: str, feedback: FeedbackIn):
             status_code=500,
             detail=f"Failed to add feedback: {str(e)}"
         )
+
+
+@router.post("/traces/{trace_id}/signal", response_model=FeedbackResponse, tags=["Governance"])
+def signal_trace_issue(trace_id: str, payload: TraceSignalIn):
+    """Mark a trace as needing review based on an agent signal."""
+    try:
+        store.update_trace_status(trace_id, TraceStatus.needs_review)
+        logger.info("Trace %s flagged for review: %s", trace_id, payload.reason)
+        return FeedbackResponse(
+            success=True,
+            message="Trace flagged for review",
+            trace_id=trace_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to signal trace: {str(e)}")
+
+
+@router.post("/curriculum/generate", tags=["Curriculum"])
+def generate_curriculum():
+    """Generate curriculum tasks from failed traces."""
+    try:
+        curator = CurriculumCurator(store)
+        created = curator.generate_curriculum()
+        return {"status": "success", "tasks_generated": created}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate curriculum: {str(e)}")
+
+
+@router.get("/curriculum", response_model=List[CurriculumTaskOut], tags=["Curriculum"])
+def list_curriculum_tasks():
+    """List all curriculum tasks ordered by creation time."""
+    session = store.get_session()
+    try:
+        return (
+            session.query(CurriculumTask)
+            .order_by(CurriculumTask.created_at.desc())
+            .all()
+        )
+    finally:
+        session.close()
+
+
+@router.get("/curriculum/export", tags=["Curriculum"])
+def export_curriculum(
+    format: str = Query("json", description="Export format: 'json' or 'jsonl'"),
+):
+    """Export pending curriculum tasks for training ingestion."""
+    format_value = format.lower().strip()
+    if format_value not in {"json", "jsonl"}:
+        raise HTTPException(status_code=400, detail="Invalid format. Use 'json' or 'jsonl'.")
+    try:
+        tasks = store.get_pending_curriculum(limit=100)
+
+        export_data = []
+        for task in tasks:
+            export_data.append(
+                {
+                    "id": task["id"],
+                    "role": "user",
+                    "content": task["instruction"],
+                    "metadata": {
+                        "difficulty": task["priority"],
+                        "focus": "auto_curriculum",
+                        "reasoning": task["context"],
+                    },
+                }
+            )
+
+        if format_value == "jsonl":
+            jsonl_content = "\n".join(json.dumps(item) for item in export_data)
+            return Response(content=jsonl_content, media_type="application/x-jsonlines")
+
+        return export_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/episodes/{episode_id}", response_model=EpisodeOut, tags=["Episodes"])

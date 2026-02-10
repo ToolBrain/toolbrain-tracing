@@ -500,6 +500,38 @@ def init_db(
 
 
 @app.command()
+def generate_curriculum():
+    """
+    Generate curriculum tasks from failed traces.
+
+    Example:
+        toolbrain-trace generate-curriculum
+    """
+    from .core.curator import CurriculumCurator
+    from .core.store import TraceStore
+
+    typer.echo("=" * 70)
+    typer.echo("ToolBrain Tracing - Curriculum Generation")
+    typer.echo("=" * 70)
+    typer.echo(f"Database:       {settings.DATABASE_URL}")
+    typer.echo(f"Backend Type:   {settings.get_backend_type()}")
+    typer.echo("")
+
+    store = TraceStore(
+        backend=settings.get_backend_type(),
+        db_url=settings.DATABASE_URL,
+    )
+    curator = CurriculumCurator(store)
+
+    try:
+        created = curator.generate_curriculum()
+        typer.echo(f"Curriculum tasks generated: {created}")
+    except Exception as e:
+        typer.echo(f"Error generating curriculum: {e}", err=True)
+        sys.exit(1)
+
+
+@app.command()
 def info():
     """
     Display current configuration and system information.
@@ -528,7 +560,8 @@ def info():
     typer.echo("")
     
     typer.echo("[Features]")
-    typer.echo(f"  Gemini AI:        {'Enabled' if settings.GEMINI_API_KEY else 'Disabled (no API key)'}")
+    typer.echo(f"  LLM Provider:     {settings.LLM_PROVIDER}")
+    typer.echo(f"  LLM API Key:      {'Configured' if settings.LLM_API_KEY else 'Missing'}")
     typer.echo("")
     
     # Check if static files exist

@@ -22,6 +22,12 @@ requests>=2.31.0
 # SQL parsing for read-only enforcement
 sqlparse>=0.5.5
 
+# Vector search
+pgvector>=0.2.5
+
+# Optional: local embeddings (install only if EMBEDDING_PROVIDER=local)
+# sentence-transformers>=2.7.0
+
 # Optional: for SQLite JSON support enhancements
 # (SQLite comes with Python, no installation needed)
 

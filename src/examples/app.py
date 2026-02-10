@@ -149,6 +149,98 @@ def submit_feedback(trace_id: str, feedback_data: Dict) -> bool:
         return False
 
 
+def request_ai_evaluation(trace_id: str, judge_model_id: str) -> Optional[Dict]:
+    """Request an AI evaluation for a trace."""
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/ai_evaluate/{trace_id}",
+            json={"judge_model_id": judge_model_id},
+            timeout=30
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        st.error(f"Failed to run AI evaluation: {e}")
+        return None
+
+
+def signal_trace_issue(trace_id: str, reason: str) -> bool:
+    """Flag a trace for review (governance signal)."""
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/traces/{trace_id}/signal",
+            json={"reason": reason},
+            timeout=10,
+        )
+        response.raise_for_status()
+        return True
+    except Exception as e:
+        st.error(f"Failed to signal trace: {e}")
+        return False
+
+
+def generate_curriculum_tasks() -> Optional[Dict]:
+    """Trigger curriculum generation on the backend."""
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/curriculum/generate",
+            timeout=30,
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        st.error(f"Failed to generate curriculum: {e}")
+        return None
+
+
+def fetch_curriculum_tasks() -> Optional[List[Dict]]:
+    """Fetch curriculum tasks from the backend."""
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/curriculum",
+            timeout=10,
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        st.error(f"Failed to fetch curriculum tasks: {e}")
+        return None
+
+
+def export_curriculum(format_value: str) -> Optional[str]:
+    """Export curriculum tasks as JSON or JSONL."""
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/curriculum/export",
+            params={"format": format_value},
+            timeout=20,
+        )
+        response.raise_for_status()
+        if format_value == "jsonl":
+            return response.text
+        return json.dumps(response.json(), indent=2)
+    except Exception as e:
+        st.error(f"Failed to export curriculum: {e}")
+        return None
+
+
+def export_traces(min_rating: int, limit: int, format_value: str) -> Optional[str]:
+    """Export high-quality traces as JSON or JSONL."""
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/export/traces",
+            params={"min_rating": min_rating, "limit": limit, "format": format_value},
+            timeout=30,
+        )
+        response.raise_for_status()
+        if format_value == "jsonl":
+            return response.text
+        return json.dumps(response.json(), indent=2)
+    except Exception as e:
+        st.error(f"Failed to export traces: {e}")
+        return None
+
+
 def query_ai_librarian(query: str, session_id: Optional[str]) -> Optional[Dict]:
     """Send a natural language query to the AI Librarian."""
     try:
@@ -418,6 +510,96 @@ def render_trace_explorer():
             for idx, feedback in enumerate(feedbacks, 1):
                 with st.expander(f"Feedback #{idx}"):
                     st.json(feedback)
+
+        st.divider()
+
+        # AI Evaluation
+        st.subheader("🤖 AI Evaluation")
+        st.markdown("*Request an AI judge rating and feedback for this trace.*")
+
+        if "ai_eval_history" not in st.session_state:
+            st.session_state.ai_eval_history = {}
+
+        eval_col1, eval_col2 = st.columns([3, 1])
+        with eval_col1:
+            judge_model_id = st.text_input(
+                "Judge Model ID",
+                placeholder="e.g., gpt-4o-mini, gemini-1.5-flash",
+                help="Model identifier to use for the AI judge"
+            )
+        with eval_col2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            run_eval = st.button("Run Evaluation", type="primary", use_container_width=True)
+
+        if run_eval:
+            if not judge_model_id.strip():
+                st.warning("Please enter a judge model id.")
+            else:
+                with st.spinner("Evaluating trace..."):
+                    result = request_ai_evaluation(trace_id, judge_model_id.strip())
+                    if result:
+                        rating = result.get("rating")
+                        feedback = result.get("feedback")
+                        st.metric("AI Rating", rating if rating is not None else "N/A")
+                        st.text_area(
+                            "AI Feedback",
+                            value=feedback or "No feedback returned.",
+                            height=120,
+                            disabled=True
+                        )
+
+                        history = st.session_state.ai_eval_history.get(trace_id, [])
+                        history.append(
+                            {
+                                "timestamp": datetime.utcnow().isoformat(),
+                                "judge_model_id": judge_model_id.strip(),
+                                "rating": rating,
+                                "feedback": feedback,
+                            }
+                        )
+                        st.session_state.ai_eval_history[trace_id] = history
+
+        history = st.session_state.ai_eval_history.get(trace_id, [])
+        if history:
+            hist_col1, hist_col2 = st.columns([3, 1])
+            with hist_col1:
+                st.subheader("🧾 AI Evaluation History")
+            with hist_col2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                clear_history = st.button("Clear History", use_container_width=True)
+            if clear_history:
+                st.session_state.ai_eval_history[trace_id] = []
+                history = []
+                st.info("AI evaluation history cleared.")
+
+        if history:
+            for idx, entry in enumerate(reversed(history), 1):
+                title = f"Run #{idx} - {entry.get('judge_model_id', 'unknown')}"
+                with st.expander(title):
+                    st.text(f"Timestamp: {entry.get('timestamp', 'N/A')}")
+                    st.text(f"Rating: {entry.get('rating', 'N/A')}")
+                    st.text_area(
+                        "Feedback",
+                        value=entry.get("feedback") or "No feedback returned.",
+                        height=120,
+                        disabled=True,
+                    )
+
+        st.divider()
+
+        # Governance signal
+        st.subheader("🚨 Governance Signal")
+        st.markdown("*Flag a trace for review if the agent needs help.*")
+        signal_reason = st.text_input(
+            "Reason",
+            placeholder="e.g., looping, low confidence, wrong output",
+        )
+        if st.button("Flag for Review", use_container_width=True):
+            if not signal_reason.strip():
+                st.warning("Please enter a reason.")
+            else:
+                if signal_trace_issue(trace_id, signal_reason.strip()):
+                    st.success("Trace flagged for review.")
         
         st.divider()
         
@@ -687,6 +869,125 @@ def render_ai_librarian():
                 st.session_state.messages.append({"role": "assistant", "content": answer})
 
 
+# Tab 4: Automated Curriculum
+
+def render_curriculum():
+    """Render the Automated Curriculum tab."""
+    st.header("🧭 Automated Curriculum")
+    st.markdown("*Generate training tasks from failed traces and review the queue.*")
+    st.divider()
+
+    if st.button("Generate Curriculum", type="primary", use_container_width=True):
+        with st.spinner("Generating curriculum tasks..."):
+            result = generate_curriculum_tasks()
+            if result:
+                count = result.get("tasks_generated", 0)
+                st.success(f"Generated {count} tasks.")
+
+    st.subheader("📌 Task Queue")
+    tasks = fetch_curriculum_tasks()
+    if tasks:
+        df = pd.DataFrame(tasks)
+        if "created_at" in df.columns:
+            df["created_at"] = df["created_at"].str.replace("T", " ", n=1)
+        st.dataframe(
+            df[["id", "task_description", "reasoning", "priority", "status", "created_at"]],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No curriculum tasks available yet.")
+
+    st.divider()
+
+    st.subheader("⬇️ Export Curriculum")
+    st.markdown("*Download curriculum tasks for training pipelines.*")
+
+    if "curriculum_export_data" not in st.session_state:
+        st.session_state.curriculum_export_data = None
+    if "curriculum_export_format" not in st.session_state:
+        st.session_state.curriculum_export_format = "json"
+
+    export_format = st.selectbox(
+        "Export Format",
+        options=["json", "jsonl"],
+        index=0,
+        key="curriculum_export_format_select",
+    )
+
+    if st.button("Prepare Curriculum Export", use_container_width=True):
+        with st.spinner("Preparing curriculum export..."):
+            st.session_state.curriculum_export_data = export_curriculum(export_format)
+            st.session_state.curriculum_export_format = export_format
+
+    if st.session_state.curriculum_export_data:
+        extension = "jsonl" if st.session_state.curriculum_export_format == "jsonl" else "json"
+        filename = f"toolbrain_curriculum_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.{extension}"
+        mime = "application/x-jsonlines" if extension == "jsonl" else "application/json"
+        st.download_button(
+            label="Download Curriculum Export",
+            data=st.session_state.curriculum_export_data,
+            file_name=filename,
+            mime=mime,
+            use_container_width=True,
+        )
+
+    st.divider()
+
+    st.subheader("⬇️ Export Traces")
+    st.markdown("*Download high-quality traces (OTLP payloads).* ")
+
+    if "trace_export_data" not in st.session_state:
+        st.session_state.trace_export_data = None
+    if "trace_export_format" not in st.session_state:
+        st.session_state.trace_export_format = "json"
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        export_min_rating = st.slider(
+            "Minimum Rating",
+            min_value=1,
+            max_value=5,
+            value=4,
+        )
+    with col2:
+        export_limit = st.number_input(
+            "Max Traces",
+            min_value=1,
+            max_value=500,
+            value=100,
+            step=10,
+        )
+    with col3:
+        trace_export_format = st.selectbox(
+            "Export Format",
+            options=["json", "jsonl"],
+            index=0,
+            key="trace_export_format_select",
+        )
+
+    if st.button("Prepare Trace Export", use_container_width=True):
+        with st.spinner("Preparing trace export..."):
+            st.session_state.trace_export_data = export_traces(
+                min_rating=int(export_min_rating),
+                limit=int(export_limit),
+                format_value=trace_export_format,
+            )
+            st.session_state.trace_export_format = trace_export_format
+
+    if st.session_state.trace_export_data:
+        extension = "jsonl" if st.session_state.trace_export_format == "jsonl" else "json"
+        filename = f"toolbrain_traces_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.{extension}"
+        mime = "application/x-jsonlines" if extension == "jsonl" else "application/json"
+        st.download_button(
+            label="Download Trace Export",
+            data=st.session_state.trace_export_data,
+            file_name=filename,
+            mime=mime,
+            use_container_width=True,
+        )
+
+
 # Main Application
 
 def main():
@@ -714,10 +1015,11 @@ def main():
     st.divider()
     
     # Create tabs
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "📊 Trace Dashboard",
         "🔍 Trace Explorer",
-        "🤖 AI Librarian (PoC)"
+        "🤖 AI Librarian (PoC)",
+        "🧭 Curriculum"
     ])
     
     with tab1:
@@ -728,6 +1030,9 @@ def main():
     
     with tab3:
         render_ai_librarian()
+
+    with tab4:
+        render_curriculum()
     
     # Footer
     st.divider()

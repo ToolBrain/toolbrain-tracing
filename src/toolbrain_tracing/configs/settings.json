@@ -3,8 +3,8 @@
     "theme": "dark"
   },
   "refresh": {
-    "autoRefresh": true,
-    "refreshInterval": 160
+    "autoRefresh": false,
+    "refreshInterval": 30
   },
   "llm": {
     "model": "qwen-14b"

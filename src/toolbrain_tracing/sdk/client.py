@@ -24,12 +24,16 @@ Usage:
 """
 
 import logging
-from typing import Dict, Any, Optional
+import json
+from datetime import datetime
+from typing import Dict, Any, Optional, List
 from urllib.parse import urljoin
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+from toolbrain_tracing.core.schema import ToolBrainAttributes, SpanType
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)
@@ -401,6 +405,28 @@ class TraceClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"Error adding feedback: {str(e)}")
             return False
+
+    def export_traces(
+        self,
+        min_rating: int = 4,
+        limit: int = 100,
+        as_jsonl: bool = False,
+    ) -> Optional[Any]:
+        """Export high-quality traces from the API."""
+        url = self._make_url("/api/v1/export/traces")
+        params = {"min_rating": min_rating, "limit": limit}
+        if as_jsonl:
+            params["format"] = "jsonl"
+
+        try:
+            response = self.session.get(url, params=params, timeout=self.timeout)
+            if response.status_code != 200:
+                logger.error(f"Failed to export traces: {response.status_code}")
+                return None
+            return response.text if as_jsonl else response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error exporting traces: {str(e)}")
+            return None
     
     def close(self):
         """
@@ -430,3 +456,126 @@ class TraceClient:
     def __repr__(self) -> str:
         """String representation of the client."""
         return f"TraceClient(base_url='{self.base_url}')"
+
+    @staticmethod
+    def _parse_iso(timestamp: Optional[str]) -> Optional[datetime]:
+        if not timestamp:
+            return None
+        try:
+            if timestamp.endswith("Z"):
+                timestamp = timestamp.replace("Z", "+00:00")
+            return datetime.fromisoformat(timestamp)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _normalize_messages(raw) -> List[Dict[str, str]]:
+        if raw is None:
+            return []
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except Exception:
+                return []
+        if isinstance(raw, dict):
+            raw = [raw]
+        if not isinstance(raw, list):
+            return []
+
+        messages: List[Dict[str, str]] = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            role = item.get("role")
+            content = item.get("content")
+            if role and content:
+                messages.append({"role": str(role), "content": str(content)})
+        return messages
+
+    @staticmethod
+    def to_messages(trace_data: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Reconstruct ChatML messages from a raw OTLP trace."""
+        messages: List[Dict[str, str]] = []
+        attributes = trace_data.get("attributes") or {}
+        system_prompt = attributes.get(ToolBrainAttributes.SYSTEM_PROMPT) or attributes.get("system_prompt")
+        if system_prompt:
+            messages.append({"role": "system", "content": str(system_prompt)})
+
+        spans = trace_data.get("spans") or []
+        spans_sorted = sorted(
+            spans,
+            key=lambda span: TraceClient._parse_iso(span.get("start_time")) or datetime.min,
+        )
+        for span in spans_sorted:
+            attrs = span.get("attributes") or {}
+            if attrs.get(ToolBrainAttributes.SPAN_TYPE) != SpanType.LLM_INFERENCE:
+                continue
+            new_content = attrs.get(ToolBrainAttributes.LLM_NEW_CONTENT)
+            messages.extend(TraceClient._normalize_messages(new_content))
+
+        return messages
+
+    @staticmethod
+    def to_turns(trace_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Reconstruct ToolBrain turns from a raw OTLP trace."""
+        turns: List[Dict[str, Any]] = []
+        messages: List[Dict[str, str]] = []
+
+        attributes = trace_data.get("attributes") or {}
+        system_prompt = attributes.get(ToolBrainAttributes.SYSTEM_PROMPT) or attributes.get("system_prompt")
+        if system_prompt:
+            messages.append({"role": "system", "content": str(system_prompt)})
+
+        spans = trace_data.get("spans") or []
+        spans_sorted = sorted(
+            spans,
+            key=lambda span: TraceClient._parse_iso(span.get("start_time")) or datetime.min,
+        )
+
+        tool_outputs: Dict[str, Any] = {}
+        for span in spans_sorted:
+            attrs = span.get("attributes") or {}
+            if attrs.get(ToolBrainAttributes.SPAN_TYPE) == SpanType.TOOL_EXECUTION:
+                parent_id = span.get("parent_id")
+                if parent_id:
+                    tool_outputs[parent_id] = attrs.get(ToolBrainAttributes.TOOL_OUTPUT)
+
+        for span in spans_sorted:
+            attrs = span.get("attributes") or {}
+            if attrs.get(ToolBrainAttributes.SPAN_TYPE) != SpanType.LLM_INFERENCE:
+                continue
+
+            new_content = attrs.get(ToolBrainAttributes.LLM_NEW_CONTENT)
+            new_messages = TraceClient._normalize_messages(new_content)
+            if new_messages:
+                messages.extend(new_messages)
+
+            turn = {
+                "prompt_for_model": [dict(item) for item in messages],
+                "model_completion": attrs.get(ToolBrainAttributes.LLM_COMPLETION),
+                "thought": attrs.get(ToolBrainAttributes.LLM_THOUGHT),
+                "tool_code": attrs.get(ToolBrainAttributes.LLM_TOOL_CODE),
+                "tool_output": tool_outputs.get(span.get("span_id")),
+            }
+            turns.append(turn)
+
+        return turns
+
+    @staticmethod
+    def to_toolbrain_turns(trace_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Format turns for ToolBrain 1.0 compatibility."""
+        turns = TraceClient.to_turns(trace_data)
+        formatted = []
+        for turn in turns:
+            formatted.append(
+                {
+                    "prompt_for_model": turn.get("prompt_for_model"),
+                    "model_completion": turn.get("model_completion"),
+                    "thought": turn.get("thought"),
+                    "tool_code": turn.get("tool_code"),
+                    "tool_output": turn.get("tool_output"),
+                    "prompt": turn.get("prompt_for_model"),
+                    "completion": turn.get("model_completion"),
+                }
+            )
+        return formatted
