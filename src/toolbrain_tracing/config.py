@@ -30,7 +30,7 @@ class Settings(BaseSettings):
         HOST: Server host address (default: "127.0.0.1")
         PORT: Server port number (default: 8000)
         LOG_LEVEL: Logging level (default: "info")
-        GEMINI_API_KEY: Optional API key for Gemini AI features
+        LLM_API_KEY: Optional API key for LLM providers
         STATIC_DIR: Path to static files directory (for React frontend)
     """
     
@@ -82,10 +82,22 @@ class Settings(BaseSettings):
         description="Recycle DB connections after N seconds"
     )
     
-    # Optional Features
-    GEMINI_API_KEY: Optional[str] = Field(
+    # Embedding Configuration
+    EMBEDDING_PROVIDER: str = Field(
+        default="local",
+        description="Embedding provider (local, openai, gemini, none)"
+    )
+    EMBEDDING_MODEL: str = Field(
+        default="all-MiniLM-L6-v2",
+        description="Embedding model name for local provider"
+    )
+    EMBEDDING_API_KEY: Optional[str] = Field(
         default=None,
-        description="Google Gemini API key for AI-powered query features"
+        description="API key for embedding provider (if required)"
+    )
+    EMBEDDING_BASE_URL: Optional[str] = Field(
+        default=None,
+        description="Base URL for embedding provider (OpenAI-compatible)"
     )
 
     # LLM Configuration (Librarian)

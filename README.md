@@ -1,17 +1,24 @@
-# ToolBrain Tracing 🧠🔍
+# ToolBrain Tracing: The Open-Source AI Operations Center (AIOC) 🧠🚀
 
-**ToolBrain Tracing** is a powerful observability and analytics platform for AI agents. Track, analyze, and optimize your agent's behavior with comprehensive tracing, feedback collection, and natural language query capabilities.
+**ToolBrain Tracing** is a comprehensive **AI Operations Center (AIOC)** designed for the era of Agentic AI. 
+
+In a world where AI agents are increasingly autonomous, ToolBrain provides the necessary infrastructure to **observe**, **govern**, and **evolve** agentic workflows. It moves beyond passive logging to create a dynamic, closed-loop system where agents learn from past experiences and humans maintain real-time control.
 
 ## ✨ Key Features
 
-- **📊 Track & Visualize Agent Behavior**: Capture and explore agent workflows in a standardized OTLP (OpenTelemetry Protocol) format
-- **🔄 Framework-Agnostic**: Works with any AI agent framework - includes smolagents integration example, with docs for building custom converters
-- **💾 Dual Backend Support**: SQLite for development, PostgreSQL for production
-- **🤖 AI-Powered Analytics**: Ask questions about your traces in natural language via LibrarianAgent (multi-provider LLM support, SQL safety, session memory)
-- **🧪 AI Evaluation**: Run an automated judge to rate traces with model feedback
-- **🖥️ Admin UI + Frontend Placeholder**: Streamlit-based admin UI today, with a `web/` directory reserved for a future React frontend
-- **🐳 Docker-Ready**: Full Docker Compose setup for one-command deployment
-- **🔌 REST API**: Clean FastAPI endpoints at `/api/v1` for easy integration
+### 📥 Ingestion Layer (Standardization)
+- **Unified Observability**: Capture agent workflows in a standardized OTLP format.
+- **Framework-Agnostic**: Simple SDK/CLI to integrate any agent (LangChain, SmolAgents, or custom).
+- **Delta-based Tracing**: Highly storage-efficient prompt tracking via `new_content` logic.
+
+### 🧠 Cognitive Layer (Self-Evolving)
+- **Experience Retrieval**: `search_past_experiences` tool for agents to perform Dynamic ICL using past successes.
+- **Curriculum Automation**: Automatically generate and export training tasks from failed traces.
+- **Semantic Search**: Powered by `pgvector` for finding similar reasoning patterns.
+
+### 🛡️ Governance Layer (Human-in-the-loop)
+- **Active Help Request**: Real-time escalation tool for agents to signal uncertainty to human experts.
+- **Interactive Command Center**: Visualize complex multi-turn traces and provide expert feedback.
 
 ## 🏗️ Architecture
 
@@ -35,10 +42,11 @@
 
 **Tech Stack:**
 - **Backend**: FastAPI, SQLAlchemy 2.0, Pydantic V2
-- **Database**: PostgreSQL (production), SQLite (development)
-- **Frontend**: React (Admin UI)
+- **Database**: PostgreSQL (production), SQLite (development), pgvector (semantic search)
+- **Frontend**: Streamlit (Admin UI), React placeholder in `web/`
 - **Deployment**: Docker Compose
-- **AI Integration**: LibrarianAgent with multi-provider LLM support
+- **AI Integration**: LibrarianAgent + AI Judge with multi-provider LLM support
+- **Embeddings**: sentence-transformers (local) or OpenAI/Gemini (cloud)
 
 ## 🚀 Quick Start
 
@@ -91,8 +99,8 @@
 2. **Install dependencies**
     ```bash
     pip install -e .
-    # Optional extras
-    # pip install -e .[ai,dev]
+    # Optional local embeddings
+    # pip install -e .[embeddings-local]
     ```
 
 3. **Run the API server** (SQLite mode)
@@ -127,6 +135,11 @@ docker compose -f docker/docker-compose.yml build --no-cache
 
 ### API Endpoints
 
+## Concepts
+
+- **Trace**: A single execution attempt (an "experiment").
+- **Episode**: A logical group of traces (attempts) aimed at solving a single user task.
+
 **Traces**
 - `POST /api/v1/traces` - Create a new trace
 - `GET /api/v1/traces` - List all traces
@@ -148,6 +161,35 @@ docker compose -f docker/docker-compose.yml build --no-cache
 
 **AI Evaluation**
 - `POST /api/v1/ai_evaluate/{trace_id}` - Evaluate a trace with a judge model
+
+**Semantic Search**
+- `GET /api/v1/traces/search` - Find similar traces using vector similarity
+
+**Governance Signals**
+- `POST /api/v1/traces/{trace_id}/signal` - Update trace status/priority
+
+**Curriculum**
+- `POST /api/v1/curriculum/generate` - Generate tasks from failed/low-rated traces
+- `GET /api/v1/curriculum` - List pending curriculum tasks
+- `GET /api/v1/curriculum/export` - Export curriculum tasks as JSONL
+
+**Exports**
+- `GET /api/v1/export/traces` - Export raw OTLP traces as JSONL
+
+### Configuration (LLM + Embeddings)
+
+Core environment variables:
+
+```bash
+# LLM (Librarian, Judge, Curator)
+LLM_PROVIDER=gemini
+LLM_MODEL=gemini-2.5-flash
+LLM_API_KEY=your-key
+
+# Embeddings (semantic search)
+EMBEDDING_PROVIDER=local
+EMBEDDING_MODEL=all-MiniLM-L6-v2
+```
 
 **Example API Usage:**
 
@@ -193,6 +235,8 @@ The admin UI provides:
 - **Analytics Dashboard**: Stats, tool usage charts
 - **AI Librarian**: Session-aware chat with suggestions and history restore
 - **AI Evaluation**: Run judge model rating and review history per trace
+- **Governance Signal**: Mark traces with status and priority
+- **Curriculum**: Generate and review training tasks
 
 Dependencies for the UI:
 
@@ -200,11 +244,31 @@ Dependencies for the UI:
 pip install streamlit pandas
 ```
 
+### Embeddings and Semantic Search
+
+Configure embeddings for vector search and experience retrieval:
+
+```bash
+# local (default)
+EMBEDDING_PROVIDER=local
+EMBEDDING_MODEL=all-MiniLM-L6-v2
+
+# cloud (OpenAI/Gemini)
+EMBEDDING_PROVIDER=openai
+EMBEDDING_API_KEY=your-key
+EMBEDDING_MODEL=text-embedding-3-small
+
+# optional for OpenAI-compatible endpoints
+EMBEDDING_BASE_URL=https://your-endpoint/v1
+```
+
 ## 🔌 Integration with Your Agent
 
 ### Using the TraceStore Client
 
 ```python
+import json
+
 from toolbrain_tracing.sdk.client import TraceClient
 
 client = TraceClient(base_url="http://localhost:8000")
@@ -218,6 +282,43 @@ client.log_trace({
 
 # Query traces
 traces = client.list_traces()
+
+# Export traces as JSONL
+jsonl_payload = client.export_traces(min_rating=4, limit=100)
+
+# Parse JSONL into Python objects
+trace_items = [json.loads(line) for line in jsonl_payload.splitlines() if line.strip()]
+
+# Reconstruct messages or turns from OTLP
+trace_data = client.get_trace("my-trace-001")
+messages = TraceClient.to_messages(trace_data)
+turns = TraceClient.to_turns(trace_data)
+toolbrain_turns = TraceClient.to_toolbrain_turns(trace_data)
+```
+
+### Agent Tools (Experience Retrieval + Active Help Request)
+
+When to use:
+
+- Use `search_past_experiences` to fetch high-quality, previously successful traces for similar tasks.
+- Use `search_similar_traces` when you need semantic similarity over trace content.
+- Use `request_human_intervention` when the agent is blocked, uncertain, or needs clarification.
+
+```python
+from toolbrain_tracing.sdk import (
+    search_past_experiences,
+    search_similar_traces,
+    request_human_intervention,
+)
+
+# Retrieve prior successful experiences
+experiences = search_past_experiences("resolve a tool error", min_rating=4, limit=3)
+
+# Semantic search over traces
+similar = search_similar_traces("multi-step planning", min_rating=4, limit=3)
+
+# Escalate to human when the agent is blocked
+help_request = request_human_intervention("User request is ambiguous, need clarification")
 ```
 
 ### Building a Custom Converter
@@ -332,6 +433,7 @@ rating = func.jsonb_extract_path_text(cast(Trace.feedback, JSONB), "rating")
 ## 📚 Documentation
 
 - **[Building Your Own Trace Converter](docs/Converter.md)** - Complete guide for integrating custom agent frameworks
+- **[Trace Reconstruction Guide](docs/Reconstructor.md)** - Rebuild full context from delta traces for training
 - **[Sample OTLP Traces](data/ToolBrain%20OTLP%20Trace%20Samples)** - Example trace files
 - **[API Documentation](http://localhost:8000/docs)** - Interactive OpenAPI docs (when server is running)
 - **[Docker Setup Guide](docker/README.md)** - Docker-specific instructions

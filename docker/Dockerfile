@@ -32,8 +32,8 @@ RUN pip install --no-cache-dir --upgrade pip --root-user-action=ignore && \
 # Copy application code
 COPY src/ /build/src/
 
-# Build application wheel
-RUN pip wheel --no-cache-dir . -w /build/wheels
+# Build application wheel (include local embeddings extra)
+RUN pip wheel --no-cache-dir .[embeddings-local] -w /build/wheels
 
 # ============================================================================
 # Stage 2: Runtime

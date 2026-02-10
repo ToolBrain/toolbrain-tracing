@@ -6,12 +6,15 @@ conforming to the ToolBrain Standard OTLP Trace Schema.
 """
 
 from datetime import datetime
+from enum import Enum
 from sqlalchemy import (
-    Column, String, Integer, DateTime, ForeignKey, Index, Text, UniqueConstraint
+    Column, String, Integer, DateTime, ForeignKey, Index, Text, UniqueConstraint, Enum as SAEnum
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.types import JSON, TypeDecorator
+
+from pgvector.sqlalchemy import Vector
 
 Base = declarative_base()
 
@@ -32,6 +35,34 @@ class JSONBCompat(TypeDecorator):
             return dialect.type_descriptor(JSONB())
         else:
             return dialect.type_descriptor(JSON())
+
+
+class VectorCompat(TypeDecorator):
+    """Vector type that uses pgvector for PostgreSQL and JSON for other databases."""
+
+    impl = JSON
+    cache_ok = True
+
+    try:
+        comparator_factory = Vector.comparator_factory
+    except AttributeError:
+        comparator_factory = getattr(Vector, "Comparator", None)
+
+    def __init__(self, dim: int):
+        super().__init__()
+        self.dim = dim
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(Vector(self.dim))
+        return dialect.type_descriptor(JSON())
+
+
+class TraceStatus(str, Enum):
+    running = "running"
+    completed = "completed"
+    needs_review = "needs_review"
+    failed = "failed"
 
 
 class Trace(Base):
@@ -65,6 +96,23 @@ class Trace(Base):
         nullable=False,
         comment="Timestamp when trace was created"
     )
+    status = Column(
+        SAEnum(TraceStatus, name="trace_status", native_enum=False),
+        default=TraceStatus.running,
+        nullable=False,
+        comment="Trace status: running|completed|needs_review|failed",
+    )
+    priority = Column(
+        Integer,
+        nullable=True,
+        default=3,
+        comment="Priority level (1-5)",
+    )
+    embedding = Column(
+        VectorCompat(384),
+        nullable=True,
+        comment="Trace embedding vector",
+    )
     feedback = Column(
         JSONBCompat,
         nullable=True,
@@ -87,7 +135,10 @@ class Trace(Base):
     )
     
     def __repr__(self):
-        return f"<Trace(id='{self.id}', episode_id='{self.episode_id}', spans={len(self.spans)})>"
+        return (
+            f"<Trace(id='{self.id}', episode_id='{self.episode_id}', "
+            f"status='{self.status}', spans={len(self.spans)})>"
+        )
 
 
 class Span(Base):
@@ -203,3 +254,21 @@ class ChatMessage(Base):
     )
 
     session = relationship("ChatSession", back_populates="messages")
+
+
+class CurriculumTask(Base):
+    """Represents a generated training task for the automated curriculum."""
+
+    __tablename__ = "curriculum_tasks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True, comment="Task ID")
+    task_description = Column(String, nullable=False, comment="Suggested training task")
+    reasoning = Column(Text, nullable=False, comment="Why this task was suggested")
+    status = Column(String, nullable=False, default="pending", comment="pending|completed")
+    priority = Column(String, nullable=False, default="medium", comment="high|medium|low")
+    created_at = Column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        nullable=False,
+        comment="Timestamp when task was created",
+    )

@@ -268,7 +268,7 @@ class GeminiProvider(BaseProvider):
         except ImportError as exc:
             raise ProviderError("google-generativeai not available") from exc
         if not api_key:
-            raise ProviderError("GEMINI_API_KEY or LLM_API_KEY is required for gemini")
+            raise ProviderError("LLM_API_KEY is required for gemini")
         genai.configure(api_key=api_key)
         self.genai = genai
         self.model_name = model
@@ -407,9 +407,6 @@ def select_provider(
     provider = (provider_override or settings.LLM_PROVIDER).lower()
     model = model_override or settings.LLM_MODEL
     api_key = settings.LLM_API_KEY
-
-    if provider == "gemini" and not api_key:
-        api_key = settings.GEMINI_API_KEY
 
     if mode == "api":
         if provider == "gemini":

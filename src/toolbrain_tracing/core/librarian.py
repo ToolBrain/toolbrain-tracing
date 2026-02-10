@@ -68,6 +68,20 @@ def _build_tool_specs() -> List[Dict[str, Any]]:
                 "required": ["query"],
             },
         }
+        ,
+        {
+            "name": "search_similar_traces",
+            "description": "Find semantically similar traces using vector search.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Semantic search query"},
+                    "min_rating": {"type": "integer", "description": "Minimum rating", "default": 4},
+                    "limit": {"type": "integer", "description": "Max results", "default": 3},
+                },
+                "required": ["query"],
+            },
+        }
     ]
 
 
@@ -86,6 +100,7 @@ class LibrarianAgent:
         return (
             "You are the ToolBrain TraceStore Librarian, a text-to-SQL assistant. "
             "Use the run_sql_query tool for ALL database access. "
+            "Use search_similar_traces for semantic similarity over trace content; use run_sql_query for metadata filters, counts, and exact matches. "
             "Only write SELECT queries. "
             "If the SQL execution fails, correct the query and try again. "
             "If the tool returns EMPTY_RESULT, do NOT hallucinate. Instead, ask a clarifying question and return JSON with suggestions. "
@@ -221,6 +236,10 @@ class LibrarianAgent:
         fallback = re.search(r"SELECT\s+.*", candidate, flags=re.IGNORECASE | re.DOTALL)
         return fallback.group(0).strip() if fallback else None
 
+    def search_similar_traces(self, query: str, min_rating: int = 4, limit: int = 3) -> str:
+        results = self.store.search_similar_experiences(query, min_rating=min_rating, limit=limit)
+        return json.dumps(results, default=str)
+
     def query(self, user_query: str, session_id: str) -> Dict[str, Any]:
         """Process a natural language query using the configured provider."""
         if not LIBRARIAN_AVAILABLE:
@@ -302,23 +321,39 @@ class LibrarianAgent:
                 break
 
             for call in tool_calls:
-                sql_query = (call.get("args") or {}).get("query", "")
-                tool_result = self.run_sql_query(sql_query)
-                self.store.save_chat_message(
-                    session_id,
-                    "tool",
-                    f"SQL: {sql_query}\nRESULT: {tool_result}",
-                )
+                tool_name = call.get("name")
+                args = call.get("args") or {}
+                if tool_name == "run_sql_query":
+                    sql_query = args.get("query", "")
+                    tool_result = self.run_sql_query(sql_query)
+                    self.store.save_chat_message(
+                        session_id,
+                        "tool",
+                        f"SQL: {sql_query}\nRESULT: {tool_result}",
+                    )
+                elif tool_name == "search_similar_traces":
+                    query = args.get("query", "")
+                    min_rating = int(args.get("min_rating", 4))
+                    limit = int(args.get("limit", 3))
+                    tool_result = self.search_similar_traces(query, min_rating=min_rating, limit=limit)
+                    self.store.save_chat_message(
+                        session_id,
+                        "tool",
+                        f"SEARCH: {query}\nRESULT: {tool_result}",
+                    )
+                else:
+                    tool_result = "UNKNOWN_TOOL"
+
                 response = self.provider.send_tool_result(
                     session,
-                    tool_name="run_sql_query",
+                    tool_name=tool_name,
                     tool_result=tool_result,
                     tool_call_id=call.get("id"),
                 )
 
-                if tool_result.startswith("EXECUTION_FAILED"):
+                if tool_name == "run_sql_query" and tool_result.startswith("EXECUTION_FAILED"):
                     break
-                if tool_result.startswith("EMPTY_RESULT"):
+                if tool_name == "run_sql_query" and tool_result.startswith("EMPTY_RESULT"):
                     result = self._abstain_response_from_llm(user_query, history_text)
                     self.store.save_chat_message(session_id, "assistant", result["answer"])
                     return result
