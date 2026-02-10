@@ -19,6 +19,7 @@ import {
 import { useMemo, useState } from "react";
 import TraceList from "./TraceList";
 import type { Trace } from "../../types/trace";
+import { traceGetPriority } from "../utils/traceUtils";
 
 interface MainContentProps {
   traces: Trace[];
@@ -29,6 +30,7 @@ interface MainContentProps {
 const sortOptions = [
   { value: "datetime", label: "DateTime" },
   { value: "duration", label: "Duration" },
+  { value: "priority", label: "Priority" },
 ];
 
 const MainContent: React.FC<MainContentProps> = ({
@@ -57,8 +59,9 @@ const MainContent: React.FC<MainContentProps> = ({
       const startTime = Math.min(...spanTimes.map((t) => t.start));
       const endTime = Math.max(...spanTimes.map((t) => t.end));
       const duration = endTime - startTime;
+      const priority = traceGetPriority(trace);
 
-      return { trace, startTime, duration };
+      return { trace, startTime, duration, priority };
     });
 
     return tracesWithMetrics
@@ -69,6 +72,8 @@ const MainContent: React.FC<MainContentProps> = ({
           compareValue = a.startTime - b.startTime;
         } else if (sortBy === "duration") {
           compareValue = a.duration - b.duration;
+        } else if (sortBy === "priority") {
+          compareValue = a.priority - b.priority;
         }
 
         return sortOrder === "asc" ? compareValue : -compareValue;

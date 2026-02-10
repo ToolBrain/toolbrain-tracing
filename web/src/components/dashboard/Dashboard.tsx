@@ -7,11 +7,23 @@ import type { Trace } from "../../types/trace";
 import type { FilterOption } from "./types";
 import { fetchTraces } from "../utils/api";
 import TraceGraph from "./TraceGraph";
-import { calculateCounts } from "./traceFilters";
 import { useSettings } from "../../contexts/SettingsContext";
+import { traceGetStatus } from "../utils/traceUtils";
 
 const DRAWER_WIDTH = 240;
 const COLLAPSED_WIDTH = 60;
+
+const FILTER_CONFIG = {
+  Status: {
+    options: [
+      { key: "running", label: "Running" },
+      { key: "completed", label: "Completed" },
+      { key: "needs_review", label: "Review" },
+      { key: "failed", label: "Failed" },
+    ],
+    getValue: (trace: Trace) => traceGetStatus(trace) || "running",
+  },
+} as const;
 
 const Dashboard: React.FC = () => {
   const { settings } = useSettings();
@@ -19,24 +31,45 @@ const Dashboard: React.FC = () => {
   const [open, setOpen] = useState(true);
   const [showContent, setShowContent] = useState(true);
 
-  const [filters, setFilters] = useState<Record<string, FilterOption[]>>({
-    Status: [
-      { label: "Success", checked: false, count: 0 },
-      { label: "Error", checked: false, count: 0 },
-    ],
+  const [filters, setFilters] = useState<Record<string, FilterOption[]>>(() => {
+    const initialFilters: Record<string, FilterOption[]> = {};
+    Object.entries(FILTER_CONFIG).forEach(([category, config]) => {
+      initialFilters[category] = config.options.map((option) => ({
+        ...option,
+        checked: false,
+        count: 0,
+      }));
+    });
+    return initialFilters;
   });
 
   // Calculate filter counts based on traces
   useEffect(() => {
-    const counts = calculateCounts(traces);
+    setFilters((prevFilters) => {
+      const newFilters = { ...prevFilters };
 
-    setFilters((prevFilters) => ({
-      ...prevFilters,
-      Status: [
-        { ...prevFilters.Status[0], count: counts.Status[0].count },
-        { ...prevFilters.Status[1], count: counts.Status[1].count },
-      ],
-    }));
+      Object.entries(FILTER_CONFIG).forEach(([category, config]) => {
+        const counts: Record<string, number> = {};
+
+        config.options.forEach((option) => {
+          counts[option.key] = 0;
+        });
+
+        traces.forEach((trace) => {
+          const value = config.getValue(trace);
+          if (counts[value] !== undefined) {
+            counts[value]++;
+          }
+        });
+
+        newFilters[category] = newFilters[category].map((filter) => ({
+          ...filter,
+          count: counts[filter.key] || 0,
+        }));
+      });
+
+      return newFilters;
+    });
   }, [traces]);
 
   // Function to fetch the latest traces
@@ -96,7 +129,7 @@ const Dashboard: React.FC = () => {
     Object.keys(filters).forEach((category) => {
       const checked = filters[category]
         .filter((f) => f.checked)
-        .map((f) => f.label);
+        .map((f) => f.key);
 
       if (checked.length > 0) {
         checkedFilters[category] = checked;
@@ -105,19 +138,9 @@ const Dashboard: React.FC = () => {
 
     // Filter traces
     return traces.filter((trace) => {
-      const hasError = trace.spans.some(
-        (span) => span.attributes?.["otel.status_code"] === "ERROR",
-      );
-
-      const isEpisode = trace.attributes?.["toolbrain.episode.id"];
-
-      const traceProperties: Record<string, string> = {
-        Status: hasError ? "Error" : "Success",
-        Type: isEpisode ? "Episode" : "Trace",
-      };
-
       return Object.keys(checkedFilters).every((category) => {
-        const traceValue = traceProperties[category];
+        const config = FILTER_CONFIG[category as keyof typeof FILTER_CONFIG];
+        const traceValue = config.getValue(trace);
         return checkedFilters[category].includes(traceValue);
       });
     });

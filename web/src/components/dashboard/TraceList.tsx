@@ -10,40 +10,25 @@ import {
   Typography,
   Paper,
   Collapse,
-  Chip,
 } from "@mui/material";
-import { KeyboardArrowDown, KeyboardArrowRight } from "@mui/icons-material";
+import {
+  Flag,
+  KeyboardArrowDown,
+  KeyboardArrowRight,
+  Layers,
+} from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import type { Trace } from "../../types/trace";
 import { customScrollbar } from "../../styles/customScrollBar";
 import React from "react";
 import { spanGetOutput, spanHasError } from "../utils/spanUtils";
+import StatusChip, { ALLOWED_STATUSES, type ChipStatus } from "./StatusChip";
+import { traceGetPriority, traceGetStatus } from "../utils/traceUtils";
 
 interface TraceListProps {
   traces: Trace[];
 }
-
-const StatusChip: React.FC<{ status: string; secondary?: boolean }> = ({
-  status,
-  secondary = false,
-}) => (
-  <Chip
-    label={status.toUpperCase()}
-    size="small"
-    sx={{
-      fontWeight: 600,
-      fontSize: "0.75rem",
-      borderRadius: "1rem",
-      color: status === "success" ? "#155724" : "#721c24",
-      backgroundColor: status === "success" ? "#e9f4ea" : "#fbe9eb",
-      border: status === "success" ? "1px solid #34c759" : "1px solid #ff4d4f",
-      minWidth: 100,
-      textAlign: "center",
-      opacity: secondary ? 0.7 : 1,
-    }}
-  />
-);
 
 const TraceList: React.FC<TraceListProps> = ({ traces }) => {
   const nav = useNavigate();
@@ -81,9 +66,9 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
     return (end - start) / 1000;
   };
 
-  const getTraceStatus = (trace: Trace): "success" | "error" => {
-    const hasError = trace.spans.some((span) => spanHasError(span));
-    return hasError ? "error" : "success";
+  const getTraceStatus = (trace: Trace): ChipStatus => {
+    const status = traceGetStatus(trace);
+    return ALLOWED_STATUSES.includes(status) ? status : "running";
   };
 
   const toggleTrace = (traceId: string) => {
@@ -200,7 +185,9 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
                     >
                       <Typography variant="body2">Trace</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {trace.spans.length} span(s)
+                        <Layers fontSize="inherit" /> {trace.spans.length}
+                        {"\t"}
+                        <Flag fontSize="inherit" /> {traceGetPriority(trace)}
                       </Typography>
                     </TableCell>
                     <TableCell

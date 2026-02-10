@@ -323,6 +323,10 @@ def _trace_to_out(trace) -> TraceOut:
         trace_attributes["system_prompt"] = trace.system_prompt
     if trace.episode_id:
         trace_attributes["toolbrain.episode.id"] = trace.episode_id
+    if trace.status:
+        trace_attributes["toolbrain.trace.status"] = trace.status
+    if trace.priority:
+        trace_attributes["toolbrain.trace.priority"] = trace.priority
 
     return TraceOut(
         trace_id=trace.id,
