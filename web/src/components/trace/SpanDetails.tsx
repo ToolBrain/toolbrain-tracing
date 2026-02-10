@@ -4,6 +4,15 @@ import type { Span } from "../../types/trace";
 import { parseLLMContent } from "./utils";
 import SpanContent from "./SpanContent";
 import TokenUsageBar from "./TokenUsageBar";
+import {
+  spanGetType,
+  spanGetToolName,
+  spanHasError,
+  spanGetUsage,
+  spanGetInput,
+  spanGetOutput,
+  spanGetSystemPrompt,
+} from "../utils/spanUtils";
 
 interface SpanDetailsProps {
   span: Span | null;
@@ -11,19 +20,13 @@ interface SpanDetailsProps {
 
 const SpanDetails: React.FC<SpanDetailsProps> = ({ span }) => {
   // Capturing JSON span attributes
-  const spanType = span?.attributes["toolbrain.span.type"];
-  const toolName = span?.attributes["toolbrain.tool.name"];
-  const hasError = span?.attributes["otel.status_code"] === "ERROR";
-  const usage = span?.attributes["toolbrain.usage"];
-  const input =
-    spanType === "llm_inference"
-      ? span?.attributes["toolbrain.llm.new_content"]
-      : span?.attributes["toolbrain.tool.input"];
-  const output =
-    spanType === "llm_inference"
-      ? span?.attributes["toolbrain.llm.completion"]
-      : span?.attributes["toolbrain.tool.output"];
-  const systemPrompt = span?.attributes["system_prompt"];
+  const spanType = spanGetType(span);
+  const toolName = spanGetToolName(span);
+  const hasError = spanHasError(span);
+  const usage = spanGetUsage(span);
+  const input = spanGetInput(span);
+  const output = spanGetOutput(span);
+  const systemPrompt = spanGetSystemPrompt(span);
 
   return (
     <Box sx={{ width: "75%", bgcolor: "background.paper", overflowY: "auto" }}>

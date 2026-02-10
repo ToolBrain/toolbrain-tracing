@@ -1,5 +1,7 @@
+import RecentHistory from "../components/history/RecentHistory";
+
 const HistoryPage: React.FC = () => {
-    return (<></>)
-}
+  return <RecentHistory />;
+};
 
 export default HistoryPage;

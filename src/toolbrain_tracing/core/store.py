@@ -423,6 +423,18 @@ class BaseStorageBackend:
         finally:
             session.close()
 
+    def add_history():
+        """Add an entry for a trace/episode to users history."""
+        return
+    
+    def get_history():
+        """Return trace/episode entries within history."""
+        return
+    
+    def clear_history():
+        """Empty the complete trace/episode entries history."""
+        return
+
 
 class SQLiteBackend(BaseStorageBackend):
     """SQLite storage backend for development and testing."""

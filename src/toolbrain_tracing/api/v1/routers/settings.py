@@ -1,7 +1,7 @@
 """
 ToolBrain TraceStore REST API Settings Router (v1)
 
-This module defines a FastAPI router to manage application settings.
+This router manages application settings.
 
 Features:
 - GET /api/v1/settings: Retrieve current settings
@@ -17,7 +17,6 @@ router = APIRouter(
     prefix="/settings",
     tags=["Settings"]
 )
-
 
 # Pydantic Models
 class AppearanceSettings(BaseModel):
@@ -52,7 +51,7 @@ class Settings(BaseModel):
         }
 
 # API Endpoints
-@router.get("")
+@router.get("/")
 async def get_settings() -> Settings:
     """Load settings from the settings file."""
     try:
@@ -60,7 +59,7 @@ async def get_settings() -> Settings:
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("")
+@router.post("/")
 async def save_settings(settings: Settings):
     """Save the settings object to the settings file."""
     try:

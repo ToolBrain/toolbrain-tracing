@@ -1,66 +1,122 @@
 import React from "react";
-import { Box, TextField, Typography, Rating, Slider } from "@mui/material";
+import { Box, TextField, Typography, Rating } from "@mui/material";
+
+export interface RatingMetrics {
+  accuracy: number | null;
+  completeness: number | null;
+  relevance: number | null;
+  safety: number | null;
+}
 
 interface FeedbackFormProps {
-  rating: number | null;
+  ratings: RatingMetrics;
   feedback: string;
-  onRatingChange: (value: number | null) => void;
+  onRatingsChange: (ratings: RatingMetrics) => void;
   onFeedbackChange: (value: string) => void;
-  disabled?: boolean;
 }
 
 const FeedbackForm: React.FC<FeedbackFormProps> = ({
-  rating,
+  ratings,
   feedback,
-  onRatingChange,
+  onRatingsChange,
   onFeedbackChange,
-  disabled = false,
 }) => {
+  const handleRatingChange = (
+    metric: keyof RatingMetrics,
+    value: number | null,
+  ) => {
+    onRatingsChange({
+      ...ratings,
+      [metric]: value,
+    });
+  };
+
+  const metrics: Array<{ key: keyof RatingMetrics; label: string }> = [
+    { key: "accuracy", label: "Accuracy" },
+    { key: "completeness", label: "Completeness" },
+    { key: "relevance", label: "Relevance" },
+    { key: "safety", label: "Safety" },
+  ];
+
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <Box>
-        <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
-          Rating
+        <Typography
+          variant="subtitle2"
+          sx={{
+            mb: 2.5,
+            fontWeight: 600,
+            fontSize: "0.875rem",
+            color: "text.secondary",
+            textTransform: "uppercase",
+          }}
+        >
+          Ratings
         </Typography>
-        <Rating
-          value={rating}
-          onChange={(_, newValue) => onRatingChange(newValue)}
-          precision={0.5}
-          size="large"
-          disabled={disabled}
-        />
-        <Slider
-          value={rating ?? 0}
-          onChange={(_, newValue) => onRatingChange(newValue as number)}
-          step={0.1}
-          min={0}
-          max={5}
-          valueLabelDisplay="auto"
-          disabled={disabled}
-          sx={{ mt: 1 }}
-        />
-        {rating !== null && (
-          <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-            {rating.toFixed(1)} / 5.0
-          </Typography>
-        )}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {metrics.map(({ key, label }) => (
+            <Box
+              key={key}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <Box sx={{ width: "30%" }}>
+                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                  {label}
+                </Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  width: "70%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.5,
+                }}
+              >
+                <Rating
+                  value={ratings[key]}
+                  onChange={(_, newValue) => handleRatingChange(key, newValue)}
+                  precision={1}
+                  max={5}
+                  size="large"
+                />
+                <Typography variant="caption" sx={{ fontFamily: "monospace" }}>
+                  {ratings[key] !== null ? `${ratings[key]}/5` : ""}
+                </Typography>
+              </Box>
+            </Box>
+          ))}
+        </Box>
       </Box>
 
       <Box>
-        <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+        <Typography
+          variant="subtitle2"
+          sx={{
+            mb: 1.5,
+            fontWeight: 600,
+            fontSize: "0.875rem",
+            color: "text.secondary",
+            textTransform: "uppercase",
+          }}
+        >
           Comments
         </Typography>
         <TextField
           multiline
           rows={10}
           fullWidth
-          placeholder="Enter your feedback here..."
+          placeholder="Enter your comments here..."
           value={feedback}
           onChange={(e) => onFeedbackChange(e.target.value)}
-          disabled={disabled}
           sx={{
             "& .MuiOutlinedInput-root": {
               fontFamily: "monospace",
+              fontSize: "0.875rem",
+              backgroundColor: "background.paper",
             },
           }}
         />

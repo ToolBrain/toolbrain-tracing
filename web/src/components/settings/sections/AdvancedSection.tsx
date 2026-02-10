@@ -1,6 +1,17 @@
-import { Stack, TextField, Typography, MenuItem } from "@mui/material";
+import React, { useState } from "react";
+import {
+  Stack,
+  TextField,
+  Typography,
+  Card,
+  CardContent,
+  MenuItem,
+} from "@mui/material";
 import { useSettings } from "../../../contexts/SettingsContext";
+import { removeSpinner } from "../../../styles/customScrollBar";
+import Toggle from "../Toggle";
 
+// Will change this once concrete models are confirmed
 const MODELS = [
   { value: "qwen-14b", label: "Qwen 14B (Local)" },
   { value: "gpt-4", label: "ChatGPT (GPT-4)" },
@@ -8,35 +19,103 @@ const MODELS = [
   { value: "gemini-pro", label: "Gemini Pro" },
 ];
 
+type FilterType = "automatic" | "manual";
+
 const AdvancedSection: React.FC = () => {
   const { settings, updateSettings } = useSettings();
 
+  const [activeFilter, setActiveFilter] = useState<FilterType | null>(null);
+  const [minSpans, setMinSpans] = useState<number | "">("");
+  const [maxDuration, setMaxDuration] = useState<number | "">("");
+
+  const handleFilterToggle = (filter: FilterType) => (checked: boolean) => {
+    setActiveFilter(checked ? filter : null);
+  };
+
   return (
     <Stack spacing={3}>
-      <Stack spacing={0.5}>
-        <Typography variant="h6">AI Evaluation</Typography>
-        <Typography variant="body2" color="text.secondary">
-          Language model used for trace evaluation.
-        </Typography>
+      <Stack spacing={3}>
+        <Stack spacing={0.5}>
+          <Typography variant="h6">AI Evaluation</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Language model used for trace evaluation.
+          </Typography>
+        </Stack>
+
+        <TextField
+          select
+          label="Model"
+          value={settings.llm.model}
+          onChange={(e) =>
+            updateSettings((draft) => {
+              draft.llm.model = e.target.value;
+            })
+          }
+          helperText="API credentials must be configured for certain models."
+        >
+          {MODELS.map(({ value, label }) => (
+            <MenuItem key={value} value={value}>
+              {label}
+            </MenuItem>
+          ))}
+        </TextField>
       </Stack>
 
-      <TextField
-        select
-        label="Model"
-        value={settings.llm.model}
-        onChange={(e) =>
-          updateSettings((draft) => {
-            draft.llm.model = e.target.value;
-          })
-        }
-        helperText="API credentials must be configured for certain models."
-      >
-        {MODELS.map((model) => (
-          <MenuItem key={model.value} value={model.value}>
-            {model.label}
-          </MenuItem>
-        ))}
-      </TextField>
+      <Stack>
+        <Stack>
+          <Typography variant="h6">Trace Filtering</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Flag traces based on configurable criteria.
+          </Typography>
+        </Stack>
+
+        <Toggle
+          label="Automatic Trace Filtering"
+          checked={activeFilter === "automatic"}
+          onChange={handleFilterToggle("automatic")}
+          tooltip="Filter traces automatically using adaptive metrics."
+        />
+
+        <Toggle
+          label="Manual Trace Filtering"
+          checked={activeFilter === "manual"}
+          onChange={handleFilterToggle("manual")}
+          tooltip="Define your own filtering criteria using the fields below."
+        />
+
+        <Card variant="outlined">
+          <CardContent>
+            <Typography variant="subtitle1" gutterBottom>
+              Manual Trace Filters
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Traces exceeding these thresholds will be flagged.
+            </Typography>
+
+            <TextField
+              type="number"
+              label="Maximum Spans"
+              value={minSpans}
+              onChange={(e) => setMinSpans(Number(e.target.value))}
+              fullWidth
+              slotProps={{ htmlInput: { min: 0 } }}
+              disabled={activeFilter !== "manual"}
+              sx={{ mb: 2, ...removeSpinner }}
+            />
+
+            <TextField
+              type="number"
+              label="Maximum Duration (ms)"
+              value={maxDuration}
+              onChange={(e) => setMaxDuration(Number(e.target.value))}
+              fullWidth
+              slotProps={{ htmlInput: { min: 0 } }}
+              disabled={activeFilter !== "manual"}
+              sx={{ ...removeSpinner }}
+            />
+          </CardContent>
+        </Card>
+      </Stack>
     </Stack>
   );
 };

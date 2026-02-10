@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -7,9 +7,14 @@ import {
   Button,
   Typography,
   Box,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
-import { Close } from "@mui/icons-material";
-import FeedbackForm from "./FeedbackForm";
+import { Close, ErrorOutline } from "@mui/icons-material";
+import FeedbackForm, { type RatingMetrics } from "./FeedbackForm";
+import { submitTraceFeedback, evaluateTrace } from "../utils/api";
+import { customScrollbar } from "../../styles/customScrollBar";
+import { useSettings } from "../../contexts/SettingsContext";
 
 interface TraceModalProps {
   open: boolean;
@@ -19,15 +24,62 @@ interface TraceModalProps {
 }
 
 const TraceModal: React.FC<TraceModalProps> = ({ open, onClose, type, id }) => {
-  const [rating, setRating] = useState<number | null>(null);
+  const [ratings, setRatings] = useState<RatingMetrics>({
+    accuracy: null,
+    completeness: null,
+    relevance: null,
+    safety: null,
+  });
   const [feedback, setFeedback] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<boolean>(false);
+  const { settings } = useSettings();
+
+  useEffect(() => {
+    const fetchEvaluation = async () => {
+      if (type === "evaluate" && open) {
+        setLoading(true);
+        setError(false);
+        try {
+          const data = await evaluateTrace(id, settings.llm.model);
+
+          setRatings(data.ratings);
+          setFeedback(data.comments);
+        } catch (error) {
+          console.error("Failed to fetch evaluation:", error);
+          setError(true);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchEvaluation();
+  }, [type, open, id, settings.llm.model]);
+
+  const handleRetry = () => {
+    setError(false);
+    setLoading(true);
+    evaluateTrace(id, settings.llm.model)
+      .then((data) => {
+        setRatings(data.ratings);
+        setFeedback(data.comments);
+      })
+      .catch((error) => {
+        console.error("Failed to fetch evaluation:", error);
+        setError(true);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
 
   const handleSubmitFeedback = async () => {
-    await fetch(`api/traces/${id}/feedback`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rating, feedback }),
-    });
+    const allRatingsProvided = Object.values(ratings).every(
+      (value) => value !== null,
+    );
+    if (!allRatingsProvided) return;
+    submitTraceFeedback(id, ratings, feedback);
     onClose();
   };
 
@@ -41,31 +93,129 @@ const TraceModal: React.FC<TraceModalProps> = ({ open, onClose, type, id }) => {
             </Typography>
 
             <FeedbackForm
-              rating={rating}
+              ratings={ratings}
               feedback={feedback}
-              onRatingChange={setRating}
+              onRatingsChange={setRatings}
               onFeedbackChange={setFeedback}
             />
           </Box>
         );
       case "evaluate":
-        return <></>;
+        if (loading) {
+          return (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                minHeight: "40vh",
+              }}
+            >
+              <CircularProgress size={48} />
+              <Typography variant="body1" sx={{ mt: 2, fontWeight: 600 }}>
+                Generating evaluation...
+              </Typography>
+            </Box>
+          );
+        }
+
+        if (error) {
+          return (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                minHeight: "40vh",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 3,
+                  p: 4,
+                  borderRadius: 2,
+                  backgroundColor: "rgba(244, 67, 54, 0.06)",
+                  border: "1px solid",
+                  borderColor: "error.light",
+                  maxWidth: "500px",
+                }}
+              >
+                <ErrorOutline sx={{ fontSize: 64, color: "error.light" }} />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Evaluation Failed
+                </Typography>
+                <Alert severity="error" sx={{ width: "100%" }}>
+                  Something went wrong while generating the evaluation. Please
+                  try again.
+                </Alert>
+                <Button variant="contained" size="large" onClick={handleRetry}>
+                  Retry
+                </Button>
+              </Box>
+            </Box>
+          );
+        }
+
+        return (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Evaluation Results
+            </Typography>
+
+            <FeedbackForm
+              ratings={ratings}
+              feedback={feedback}
+              onRatingsChange={setRatings}
+              onFeedbackChange={setFeedback}
+            />
+          </Box>
+        );
     }
   };
 
   const renderActions = () => {
+    if (type === "evaluate" && (loading || error)) {
+      return null;
+    }
+
+    const allRatingsProvided = Object.values(ratings).every(
+      (value) => value !== null,
+    );
+
     switch (type) {
       case "feedback":
         return (
           <>
             <Button onClick={onClose}>Cancel</Button>
-            <Button variant="contained" onClick={handleSubmitFeedback}>
+            <Button
+              variant="contained"
+              onClick={handleSubmitFeedback}
+              disabled={!allRatingsProvided}
+            >
               Submit
             </Button>
           </>
         );
       case "evaluate":
-        return <></>;
+        return (
+          <>
+            <Button onClick={onClose}>Cancel</Button>
+            <Button
+              variant="contained"
+              onClick={handleSubmitFeedback}
+              disabled={!allRatingsProvided}
+            >
+              Submit
+            </Button>
+          </>
+        );
     }
   };
 
@@ -93,7 +243,9 @@ const TraceModal: React.FC<TraceModalProps> = ({ open, onClose, type, id }) => {
         <Close />
       </IconButton>
 
-      <DialogContent>{renderContent()}</DialogContent>
+      <DialogContent sx={{ ...customScrollbar }}>
+        {renderContent()}
+      </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>{renderActions()}</DialogActions>
     </Dialog>

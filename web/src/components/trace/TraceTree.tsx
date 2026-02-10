@@ -11,6 +11,8 @@ import {
 } from "@mui/icons-material";
 import type { Span, Trace } from "../../types/trace";
 import TraceModal from "./TraceModal";
+import { useParams } from "react-router-dom";
+import { spanHasError } from "../utils/spanUtils";
 
 interface TraceTreeProps {
   traces: Trace[];
@@ -30,6 +32,7 @@ const TraceTree: React.FC<TraceTreeProps> = ({
   const [openModal, setOpenModal] = useState<"feedback" | "evaluate" | null>(
     null,
   );
+  const { id } = useParams<{ id: string }>() as { id: string };
 
   const getDuration = (span: Span) => {
     const ms =
@@ -51,7 +54,7 @@ const TraceTree: React.FC<TraceTreeProps> = ({
     const children = spansByParent.get(span.span_id) || [];
     const isExpanded = expandedNodes.has(span.span_id);
     const isSelected = selectedSpan === span.span_id;
-    const hasError = span.attributes["otel.status_code"] === "ERROR";
+    const hasError = spanHasError(span);
 
     return (
       <>
@@ -231,7 +234,7 @@ const TraceTree: React.FC<TraceTreeProps> = ({
           open={true}
           onClose={() => setOpenModal(null)}
           type={openModal}
-          id={"1"}
+          id={id}
         />
       )}
     </Box>

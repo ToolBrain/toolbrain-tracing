@@ -82,7 +82,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <ExpandLess fontSize="small" />
               )}
             </IconButton>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 600, fontFamily: "monospace" }}
+            >
               {section} ({options.filter((o) => o.checked).length})
             </Typography>
           </Box>
@@ -109,7 +112,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                       />
                     }
                     label={
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600, fontFamily: "monospace" }}
+                      >
                         {option.label}
                       </Typography>
                     }

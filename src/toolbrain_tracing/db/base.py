@@ -203,3 +203,20 @@ class ChatMessage(Base):
     )
 
     session = relationship("ChatSession", back_populates="messages")
+
+
+class History(Base):
+    __tablename__ = "history"
+
+    id = Column(String, primary_key=True, comment="Trace or episode ID")
+    type = Column(String, nullable=False, comment="'trace' or 'episode'")
+    last_accessed = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        comment="Most recent access timestamp"
+    )
+
+    __table_args__ = (
+        Index("idx_accessed", "last_accessed"),
+    )

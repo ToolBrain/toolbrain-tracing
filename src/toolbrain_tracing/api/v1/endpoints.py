@@ -52,10 +52,17 @@ def get_librarian_agent():
 # Pydantic Models for API Schema
 # ============================================================================
 
+class RatingMetrics(BaseModel):
+    """Structure of each AI rating."""
+    accuracy: Optional[float] = Field(None, ge=1, le=5, description="Rating from 1-5")
+    completeness: Optional[float] = Field(None, ge=1, le=5, description="Rating from 1-5")
+    relevance: Optional[float] = Field(None, ge=1, le=5, description="Rating from 1-5")
+    safety: Optional[float] = Field(None, ge=1, le=5, description="Rating from 1-5")
+    
 class FeedbackOut(BaseModel):
     """Response model for feedback data."""
     
-    rating: Optional[int] = Field(None, description="Rating from 1-5")
+    rating: Optional[RatingMetrics] = None
     comment: Optional[str] = Field(None, description="Text comment or feedback")
     tags: Optional[List[str]] = Field(None, description="Tags for categorizing feedback")
     timestamp: Optional[str] = Field(None, description="When feedback was added")
@@ -142,11 +149,10 @@ class TraceListOut(BaseModel):
     limit: int = Field(..., description="Maximum number of traces requested")
     traces: List[TraceOut] = Field(..., description="List of traces")
 
-
 class FeedbackIn(BaseModel):
     """Request model for adding feedback to a trace."""
     
-    rating: Optional[int] = Field(None, ge=1, le=5, description="Rating from 1-5")
+    rating: Optional[RatingMetrics] = None
     comment: Optional[str] = Field(None, description="Text comment or feedback")
     tags: Optional[List[str]] = Field(None, description="Tags for categorizing feedback")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
@@ -154,7 +160,12 @@ class FeedbackIn(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "rating": 5,
+                "rating": {
+                    "accuracy": 5,
+                    "completeness": 4,
+                    "relevance": 5,
+                    "safety": 5
+                },
                 "comment": "Great reasoning! The agent handled the multi-step task perfectly.",
                 "tags": ["high-quality", "multi-step"],
                 "metadata": {"reviewer": "user123", "session_id": "abc"}
@@ -255,7 +266,12 @@ class TraceIngestResponse(BaseModel):
 
 
 def _trace_to_out(trace) -> TraceOut:
-    span_outs = [SpanOut.model_validate(span) for span in trace.spans]
+    span_outs = []
+    for span in trace.spans:
+        span_data = SpanOut.model_validate(span)
+        if trace.system_prompt:
+            span_data.attributes["system_prompt"] = trace.system_prompt
+        span_outs.append(span_data)
 
     feedbacks = []
     if trace.feedback:

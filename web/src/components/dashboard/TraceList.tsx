@@ -16,8 +16,9 @@ import { KeyboardArrowDown, KeyboardArrowRight } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import type { Trace } from "../../types/trace";
-import { customScrollbar } from "../../styles/CustomScrollBar";
+import { customScrollbar } from "../../styles/customScrollBar";
 import React from "react";
+import { spanGetOutput, spanHasError } from "../utils/spanUtils";
 
 interface TraceListProps {
   traces: Trace[];
@@ -81,16 +82,8 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
   };
 
   const getTraceStatus = (trace: Trace): "success" | "error" => {
-    const hasError = trace.spans.some(
-      (span) => span.attributes["otel.status_code"] === "ERROR",
-    );
+    const hasError = trace.spans.some((span) => spanHasError(span));
     return hasError ? "error" : "success";
-  };
-
-  const getSpanStatus = (span: any): "success" | "error" => {
-    return span.attributes["otel.status_code"] === "ERROR"
-      ? "error"
-      : "success";
   };
 
   const toggleTrace = (traceId: string) => {
@@ -142,15 +135,13 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
             <TableCell sx={{ width: "15%", fontWeight: 600 }}>
               Timestamp
             </TableCell>
-            <TableCell sx={{ width: "20%", fontWeight: 600 }}>
-              Trace ID
-            </TableCell>
+            <TableCell sx={{ width: "20%", fontWeight: 600 }}>Type</TableCell>
             <TableCell sx={{ width: "20%", fontWeight: 600 }}>Status</TableCell>
             <TableCell sx={{ width: "20%", fontWeight: 600 }}>
               Duration
             </TableCell>
             <TableCell sx={{ width: "20%", fontWeight: 600 }}>
-              Episode ID
+              Trace ID
             </TableCell>
           </TableRow>
         </TableHead>
@@ -171,6 +162,7 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
               return (
                 <React.Fragment key={trace.trace_id}>
                   <TableRow
+                    hover
                     sx={{
                       cursor: "pointer",
                       "&:hover": { bgcolor: "action.hover" },
@@ -206,7 +198,7 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
                       onClick={() => handleTraceClick(trace.trace_id)}
                       sx={{ p: 2 }}
                     >
-                      <Typography variant="body2">{trace.trace_id}</Typography>
+                      <Typography variant="body2">Trace</Typography>
                       <Typography variant="caption" color="text.secondary">
                         {trace.spans.length} span(s)
                       </Typography>
@@ -240,7 +232,7 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
                           color: "text.secondary",
                         }}
                       >
-                        {trace.attributes["toolbrain.episode.id"]}
+                        {trace.trace_id}
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -267,7 +259,8 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
                                     new Date(span.start_time).getTime()) /
                                   1000
                                 ).toFixed(2);
-                                const spanStatus = getSpanStatus(span);
+                                const spanStatus: "success" | "error" =
+                                  spanHasError(span) ? "error" : "success";
 
                                 return (
                                   <TableRow
@@ -314,13 +307,7 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
                                           whiteSpace: "nowrap",
                                         }}
                                       >
-                                        {span.attributes[
-                                          "toolbrain.llm.completion"
-                                        ] ??
-                                          span.attributes[
-                                            "toolbrain.tool.output"
-                                          ] ??
-                                          ""}
+                                        {spanGetOutput(span)}
                                       </Typography>
                                     </TableCell>
                                     <TableCell sx={{ p: 2 }}>

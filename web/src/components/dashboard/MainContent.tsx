@@ -43,12 +43,8 @@ const MainContent: React.FC<MainContentProps> = ({
   // Sort traces based on sortBy and sortOrder
   const sortedTraces = useMemo(() => {
     // Filter traces by searchQuery
-    const filteredTraces = traces.filter(
-      (trace) =>
-        trace.trace_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        trace.attributes["toolbrain.episode.id"]
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()),
+    const filteredTraces = traces.filter((trace) =>
+      trace.trace_id.toLowerCase().includes(searchQuery.toLowerCase()),
     );
 
     const tracesWithMetrics = filteredTraces.map((trace) => {
