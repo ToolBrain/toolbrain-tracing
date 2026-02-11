@@ -11,6 +11,7 @@ Features:
 - GET /api/v1/stats: Get database statistics
 - GET /api/v1/analytics/tool_usage: Get tool usage analytics
 - POST /api/v1/natural_language_query: AI-powered natural language queries
+- GET /api/v1/episodes/{episode_id}/traces: Retrieve all traces belonging to an episode
 """
 
 from typing import List, Optional, Dict, Any
