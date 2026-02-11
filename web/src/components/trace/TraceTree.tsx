@@ -8,6 +8,7 @@ import {
   Schedule,
   ThumbUpOutlined,
   AutoAwesome,
+  FileDownload,
 } from "@mui/icons-material";
 import type { Span, Trace } from "../../types/trace";
 import TraceModal from "./TraceModal";
@@ -208,9 +209,18 @@ const TraceTree: React.FC<TraceTreeProps> = ({
           borderColor: "divider",
           display: "flex",
           gap: 1,
-          justifyContent: "flex-end",
+          justifyContent: "center",
+          flexWrap: "wrap",
         }}
       >
+        <Button
+          variant="outlined"
+          size="medium"
+          startIcon={<FileDownload fontSize="small" />}
+          onClick={() => {}}
+        >
+          Download
+        </Button>
         <Button
           variant="outlined"
           size="medium"

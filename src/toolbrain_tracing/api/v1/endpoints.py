@@ -236,9 +236,14 @@ class TraceSummaryOut(BaseModel):
 
 
 class EpisodeOut(BaseModel):
-    """Details for an episode containing multiple traces."""
+    """Details for an episode containing multiple traces details."""
     episode_id: str
     traces: List[TraceSummaryOut]
+
+class EpisodeTracesOut(BaseModel):
+    """Details for an episode containing multiple traces."""
+    episode_id: str
+    traces: List[TraceOut]
 
 
 class AIEvaluationIn(BaseModel):
@@ -696,6 +701,24 @@ def get_episode_details(episode_id: str):
             )
 
         return EpisodeOut(episode_id=episode_id, traces=trace_summaries)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/episodes/{episode_id}/traces", response_model=EpisodeTracesOut, tags=["Episodes"])
+def get_episode_traces(episode_id: str):
+    """Get all traces related to an episode"""
+    try:
+        traces_in_episode = store.get_traces_by_episode_id(episode_id)
+        if not traces_in_episode:
+            raise HTTPException(status_code=404, detail="Episode not found")
+        
+        trace_ids = [trace.id for trace in traces_in_episode]
+        traces = store.get_traces_by_ids(trace_ids, include_spans=True)
+        trace_outs = [_trace_to_out(trace) for trace in traces]
+        return EpisodeTracesOut(episode_id=episode_id, traces=trace_outs)
 
     except HTTPException:
         raise
