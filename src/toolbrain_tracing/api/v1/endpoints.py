@@ -332,14 +332,23 @@ def root():
         "description": "REST API for managing agent execution traces",
         "docs": "/docs",
         "endpoints": {
+            "health": "GET /api/v1/health",
             "list_traces": "GET /api/v1/traces",
             "get_trace": "GET /api/v1/traces/{trace_id}",
+            "ingest_trace": "POST /api/v1/traces",
             "add_feedback": "POST /api/v1/traces/{trace_id}/feedback",
+            "signal_trace": "POST /api/v1/traces/{trace_id}/signal",
+            "search_traces": "GET /api/v1/traces/search",
+            "export_traces": "GET /api/v1/export/traces",
             "get_episode": "GET /api/v1/episodes/{episode_id}",
             "stats": "GET /api/v1/stats",
             "tool_usage": "GET /api/v1/analytics/tool_usage",
             "ai_evaluate": "POST /api/v1/ai_evaluate/{trace_id}",
-            "natural_language_query": "POST /api/v1/natural_language_query"
+            "natural_language_query": "POST /api/v1/natural_language_query",
+            "librarian_session": "GET /api/v1/librarian_sessions/{session_id}",
+            "curriculum_generate": "POST /api/v1/curriculum/generate",
+            "curriculum_list": "GET /api/v1/curriculum",
+            "curriculum_export": "GET /api/v1/curriculum/export"
         }
     }
 
