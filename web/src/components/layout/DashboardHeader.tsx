@@ -15,6 +15,7 @@ const pages = [
   { label: "Dashboard", path: "/dashboard" },
   { label: "Trace Explorer", path: "/explorer" },
   { label: "History", path: "/history" },
+  { label: "Training Plan ", path: "/training" },
   { label: "Settings", path: "/settings" },
 ];
 

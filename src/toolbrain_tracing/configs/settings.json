@@ -7,6 +7,9 @@
     "refreshInterval": 30
   },
   "llm": {
-    "model": "qwen-14b"
+    "model": "gpt-4o"
+  },
+  "chatLLM": {
+    "model": "gpt-4o"
   }
 }

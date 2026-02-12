@@ -37,7 +37,7 @@ const STATUS_STYLES: Record<
     color: "#7c2d12",
     bg: "#fff7ed",
     border: "#f97316",
-    label: "REVIEW",
+    label: "URGENT",
   },
   error: { color: "#721c24", bg: "#fbe9eb", border: "#ff4d4f", label: "ERROR" },
   failed: {

@@ -18,6 +18,9 @@ interface Settings {
   llm: {
     model: string;
   };
+  chatLLM: {
+    model: string;
+  };
 }
 
 interface SettingsContextType {
@@ -29,7 +32,8 @@ interface SettingsContextType {
 const DEFAULT_SETTINGS: Settings = {
   appearance: { theme: "light" },
   refresh: { autoRefresh: false, refreshInterval: 30 },
-  llm: { model: "qwen-14b" },
+  llm: { model: "gemini-2.5-flash" },
+  chatLLM: { model: "gemini-2.5-flash" },
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(

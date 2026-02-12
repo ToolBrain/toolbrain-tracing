@@ -20,7 +20,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import type { Trace } from "../../types/trace";
-import { customScrollbar } from "../../styles/customScrollBar";
 import React from "react";
 import { spanGetOutput, spanHasError } from "../utils/spanUtils";
 import StatusChip, { ALLOWED_STATUSES, type ChipStatus } from "./StatusChip";
@@ -103,7 +102,6 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
         border: "1px solid",
         borderColor: "divider",
         height: "100%",
-        ...customScrollbar,
       }}
     >
       <Table>
@@ -191,7 +189,10 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
                         />
                         {trace.spans.length}
                         {"\t"}
-                        <Flag fontSize="inherit" sx={{ color: "error.main" }} />
+                        <Flag
+                          fontSize="inherit"
+                          sx={{ color: "error.light" }}
+                        />
                         {traceGetPriority(trace)}
                       </Typography>
                     </TableCell>

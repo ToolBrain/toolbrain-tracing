@@ -18,7 +18,7 @@ const FILTER_CONFIG = {
     options: [
       { key: "running", label: "Running" },
       { key: "completed", label: "Completed" },
-      { key: "needs_review", label: "Review" },
+      { key: "needs_review", label: "Urgent" },
       { key: "failed", label: "Failed" },
     ],
     getValue: (trace: Trace) => traceGetStatus(trace) || "running",

@@ -29,10 +29,14 @@ class RefreshSettings(BaseModel):
 class LLMSettings(BaseModel):
     model: str
 
+class ChatLLMSettings(BaseModel):
+    model: str
+
 class Settings(BaseModel):
     appearance: AppearanceSettings
     refresh: RefreshSettings
     llm: LLMSettings
+    chatLLM: ChatLLMSettings
     
     class Config:
         json_schema_extra = {
@@ -45,6 +49,9 @@ class Settings(BaseModel):
                     "refreshInterval": 160
                 },
                 "llm": {
+                    "model": "gpt-4"
+                },
+                "chatLLM": {
                     "model": "gpt-4"
                 }
             }

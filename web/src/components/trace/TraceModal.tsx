@@ -13,7 +13,6 @@ import {
 import { Close, ErrorOutline } from "@mui/icons-material";
 import FeedbackForm from "./FeedbackForm";
 import { submitTraceFeedback, evaluateTrace } from "../utils/api";
-import { customScrollbar } from "../../styles/customScrollBar";
 import { useSettings } from "../../contexts/SettingsContext";
 
 interface TraceModalProps {
@@ -231,9 +230,7 @@ const TraceModal: React.FC<TraceModalProps> = ({ open, onClose, type, id }) => {
         <Close />
       </IconButton>
 
-      <DialogContent sx={{ ...customScrollbar }}>
-        {renderContent()}
-      </DialogContent>
+      <DialogContent>{renderContent()}</DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>{renderActions()}</DialogActions>
     </Dialog>

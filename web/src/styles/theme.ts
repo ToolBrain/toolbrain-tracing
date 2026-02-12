@@ -1,7 +1,7 @@
 import { createTheme } from "@mui/material";
 
 export const createAppTheme = (themeMode: "light" | "dark") => {
-  return createTheme({
+  const theme = createTheme({
     palette: {
       mode: themeMode,
       primary: {
@@ -18,12 +18,36 @@ export const createAppTheme = (themeMode: "light" | "dark") => {
         },
       }),
     },
+  });
+
+  const customScrollbar = {
+    "::-webkit-scrollbar": {
+      width: "8px",
+    },
+    "::-webkit-scrollbar-track": {
+      backgroundColor: theme.palette.background.paper,
+      borderRadius: "4px",
+    },
+    "::-webkit-scrollbar-thumb": {
+      backgroundColor: theme.palette.action.disabled,
+      borderRadius: "4px",
+      "&:hover": {
+        backgroundColor: theme.palette.action.active,
+      },
+    },
+  };
+
+  return createTheme({
+    ...theme,
     components: {
       MuiButton: {
         styleOverrides: {
-          root: {
-            textTransform: "none",
-          },
+          root: { textTransform: "none" },
+        },
+      },
+      MuiCssBaseline: {
+        styleOverrides: {
+          ...customScrollbar,
         },
       },
     },

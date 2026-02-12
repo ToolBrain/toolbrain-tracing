@@ -8,15 +8,20 @@ import {
   MenuItem,
 } from "@mui/material";
 import { useSettings } from "../../../contexts/SettingsContext";
-import { removeSpinner } from "../../../styles/customScrollBar";
 import Toggle from "../Toggle";
 
-// Will change this once concrete models are confirmed
-const MODELS = [
-  { value: "qwen-14b", label: "Qwen 14B (Local)" },
-  { value: "gpt-4", label: "ChatGPT (GPT-4)" },
-  { value: "claude-3-opus", label: "Claude 3 Opus" },
-  { value: "gemini-pro", label: "Gemini Pro" },
+const EVALUATION_MODELS = [
+  { value: "qwen2.5:7b", label: "Qwen 2.5 7B (Local)" },
+  { value: "gpt-4o", label: "GPT-4o" },
+  { value: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+];
+
+const CHAT_MODELS = [
+  { value: "qwen2.5:7b", label: "Qwen 2.5 7B (Local)" },
+  { value: "gpt-4o", label: "GPT-4o" },
+  { value: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
 ];
 
 type FilterType = "automatic" | "manual";
@@ -35,6 +40,7 @@ const AdvancedSection: React.FC = () => {
   return (
     <Stack spacing={3}>
       <Stack spacing={3}>
+        {/* AI Evaluation Model */}
         <Stack spacing={0.5}>
           <Typography variant="h6">AI Evaluation</Typography>
           <Typography variant="body2" color="text.secondary">
@@ -53,7 +59,7 @@ const AdvancedSection: React.FC = () => {
           }
           helperText="API credentials must be configured for certain models."
         >
-          {MODELS.map(({ value, label }) => (
+          {EVALUATION_MODELS.map(({ value, label }) => (
             <MenuItem key={value} value={value}>
               {label}
             </MenuItem>
@@ -61,6 +67,35 @@ const AdvancedSection: React.FC = () => {
         </TextField>
       </Stack>
 
+      {/* Chat Model */}
+      <Stack spacing={3}>
+        <Stack spacing={0.5}>
+          <Typography variant="h6">ToolBrain Librarian</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Language model used for chat.
+          </Typography>
+        </Stack>
+
+        <TextField
+          select
+          label="Model"
+          value={settings.chatLLM.model}
+          onChange={(e) =>
+            updateSettings((draft) => {
+              draft.chatLLM.model = e.target.value;
+            })
+          }
+          helperText="API credentials must be configured for certain models."
+        >
+          {CHAT_MODELS.map(({ value, label }) => (
+            <MenuItem key={value} value={value}>
+              {label}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Stack>
+
+      {/* Filters */}
       <Stack>
         <Stack>
           <Typography variant="h6">Trace Filtering</Typography>
@@ -100,7 +135,7 @@ const AdvancedSection: React.FC = () => {
               fullWidth
               slotProps={{ htmlInput: { min: 0 } }}
               disabled={activeFilter !== "manual"}
-              sx={{ mb: 2, ...removeSpinner }}
+              sx={{ mb: 2 }}
             />
 
             <TextField
@@ -111,7 +146,6 @@ const AdvancedSection: React.FC = () => {
               fullWidth
               slotProps={{ htmlInput: { min: 0 } }}
               disabled={activeFilter !== "manual"}
-              sx={{ ...removeSpinner }}
             />
           </CardContent>
         </Card>

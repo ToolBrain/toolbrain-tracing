@@ -59,7 +59,7 @@ const HomeNavCard: React.FC<HomeNavCardProps> = ({
         <Icon sx={{ fontSize: 32 }} />
       </Box>
 
-      <Typography variant="h6" fontWeight={600}>
+      <Typography variant="h6" sx={{ fontWeight: 600 }}>
         {title}
       </Typography>
 
