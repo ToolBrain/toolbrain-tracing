@@ -216,14 +216,6 @@ const TraceTree: React.FC<TraceTreeProps> = ({
         <Button
           variant="outlined"
           size="medium"
-          startIcon={<FileDownload fontSize="small" />}
-          onClick={() => {}}
-        >
-          Download
-        </Button>
-        <Button
-          variant="outlined"
-          size="medium"
           startIcon={<ThumbUpOutlined fontSize="small" />}
           onClick={() => setOpenModal("feedback")}
         >
