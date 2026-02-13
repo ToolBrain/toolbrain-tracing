@@ -15,7 +15,7 @@ def tool(func):
     return func
 
 
-API_BASE_URL = os.getenv("TOOLBRAIN_API_BASE_URL", "http://localhost:8000/api/v1")
+API_BASE_URL = os.getenv("TRACEBRAIN_API_BASE_URL", "http://localhost:8000/api/v1")
 
 
 @tool
@@ -45,11 +45,11 @@ def search_similar_traces(query: str, min_rating: int = 4, limit: int = 3) -> Di
 @tool
 def request_human_intervention(reason: str) -> Dict[str, Any]:
     """Escalate to the command center by flagging a trace for review."""
-    trace_id = os.getenv("TOOLBRAIN_TRACE_ID")
+    trace_id = os.getenv("TRACEBRAIN_TRACE_ID")
     if not trace_id:
         return {
             "success": False,
-            "message": "trace_id is required to signal a trace. Set TOOLBRAIN_TRACE_ID.",
+            "message": "trace_id is required to signal a trace. Set TRACEBRAIN_TRACE_ID.",
             "reason": reason,
         }
 

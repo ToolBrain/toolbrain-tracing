@@ -30,7 +30,7 @@ my_agent = CodeAgent(
 )
 print("✅ Agent is ready.")
 
-# PART 2: RUN AND LOG TRACE TO TOOLBRAIN TRACING
+# PART 2: RUN AND LOG TRACE TO TRACEBRAIN TRACING
 
 if __name__ == "__main__":
     # 1. Initialize TraceClient
