@@ -1,5 +1,5 @@
 """
-ToolBrain TraceStore REST API History Router (v1)
+TraceBrain TraceStore REST API History Router (v1)
 
 This router manages already viewed traces and episodes.
 

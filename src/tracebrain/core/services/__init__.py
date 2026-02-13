@@ -1,1 +1,1 @@
-"""Core services for ToolBrain."""
+"""Core services for TraceBrain."""

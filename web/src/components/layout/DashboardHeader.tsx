@@ -6,7 +6,7 @@ import Typography from "@mui/material/Typography";
 import Container from "@mui/material/Container";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
-import toolbrainimg from "../../assets/toolbrain.png";
+import tracebrainimg from "../../assets/tracebrain.png";
 import { useNavigate, useLocation } from "react-router-dom";
 import { LightMode, DarkMode } from "@mui/icons-material";
 import { useSettings } from "../../contexts/SettingsContext";
@@ -54,7 +54,7 @@ const DashboardHeader: React.FC = () => {
             >
               <Box
                 component={"img"}
-                src={toolbrainimg}
+                src={tracebrainimg}
                 sx={{ width: "5rem" }}
               />
               <Typography

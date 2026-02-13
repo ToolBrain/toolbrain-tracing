@@ -1,8 +1,8 @@
-# ToolBrain Tracing: The Open-Source AI Operations Center (AIOC) 🧠🚀
+# TraceBrain: An Open-Source Framework for Agentic Trace Management 🧠🚀
 
-**ToolBrain Tracing** is a comprehensive **AI Operations Center (AIOC)** designed for the era of Agentic AI. 
+**TraceBrain** is a comprehensive trace management platform purpose-built for the era of Agentic AI.
 
-In a world where AI agents are increasingly autonomous, ToolBrain provides the necessary infrastructure to **observe**, **govern**, and **evolve** agentic workflows. It moves beyond passive logging to create a dynamic, closed-loop system where agents learn from past experiences and humans maintain real-time control.
+As AI agents become increasingly autonomous and operationally complex, TraceBrain provides the infrastructure required to **observe**, **govern**, and **continuously refine** agentic workflows. Rather than functioning as a passive logging system, it establishes an active, closed-loop environment where operational traces are systematically collected, standardized, and transformed into actionable insights—enabling agents to improve from historical execution data while allowing human operators to retain oversight and control.
 
 ## ✨ Key Features
 
@@ -22,18 +22,7 @@ In a world where AI agents are increasingly autonomous, ToolBrain provides the n
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────┐      ┌──────────────────┐      ┌─────────────┐
-│  Your AI Agent  │─────▶│  TraceStore API  │─────▶│  PostgreSQL │
-│   (smolagents,  │      │    (FastAPI)     │      │   / SQLite  │
-│    or custom)   │      └──────────────────┘      └─────────────┘
-└─────────────────┘              │
-                                 ▼
-                       ┌──────────────────┐
-                       │  Admin Panel UI  │
-                       │                  │
-                       └──────────────────┘
-```
+![System Architecture](images/system_architecture.jpg)
 
 - **Your AI Agent:** Any agent framework. Uses the TraceClient SDK to send data.
 - **TraceStore API:** The central FastAPI server. Ingests, stores, and serves trace data.
@@ -60,8 +49,8 @@ In a world where AI agents are increasingly autonomous, ToolBrain provides the n
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/ToolBrain/toolbrain-tracing.git
-   cd toolbrain-tracing
+   git clone https://github.com/TraceBrain/tracebrain-tracing.git
+   cd tracebrain-tracing
    ```
 
 2. **Start the services**
@@ -70,7 +59,7 @@ In a world where AI agents are increasingly autonomous, ToolBrain provides the n
    pip install -e .
    
    # Start PostgreSQL + API server
-   toolbrain-trace up
+   tracebrain-trace up
    ```
 
 3. **Access the services**
@@ -105,8 +94,8 @@ In a world where AI agents are increasingly autonomous, ToolBrain provides the n
 
 3. **Run the API server** (SQLite mode)
     ```bash
-    toolbrain-trace init-db
-    toolbrain-trace start
+    tracebrain-trace init-db
+    tracebrain-trace start
     ```
 
 4. **Run the Streamlit UI**
@@ -121,13 +110,13 @@ In a world where AI agents are increasingly autonomous, ToolBrain provides the n
 
 ```bash
 # Start Docker services
-toolbrain-trace up
+tracebrain-trace up
 
 # Start with rebuild (after code changes)
-toolbrain-trace up --build
+tracebrain-trace up --build
 
 # Stop services
-toolbrain-trace down
+tracebrain-trace down
 
 # Manual Docker rebuild (if changes aren't picked up)
 docker compose -f docker/docker-compose.yml build --no-cache
@@ -207,8 +196,8 @@ response = requests.post("http://localhost:8000/api/v1/traces", json={
             "start_time": "2024-01-01T10:00:00Z",
             "end_time": "2024-01-01T10:00:05Z",
             "attributes": {
-                "toolbrain.span.type": "user_request",
-                "toolbrain.content.new_content": "What's the stock price of NVIDIA?"
+                "tracebrain.span.type": "user_request",
+                "tracebrain.content.new_content": "What's the stock price of NVIDIA?"
             }
         }
     ]
@@ -269,7 +258,7 @@ EMBEDDING_BASE_URL=https://your-endpoint/v1
 ```python
 import json
 
-from toolbrain_tracing.sdk.client import TraceClient
+from tracebrain.sdk.client import TraceClient
 
 client = TraceClient(base_url="http://localhost:8000")
 
@@ -293,7 +282,7 @@ trace_items = [json.loads(line) for line in jsonl_payload.splitlines() if line.s
 trace_data = client.get_trace("my-trace-001")
 messages = TraceClient.to_messages(trace_data)
 turns = TraceClient.to_turns(trace_data)
-toolbrain_turns = TraceClient.to_toolbrain_turns(trace_data)
+tracebrain_turns = TraceClient.to_tracebrain_turns(trace_data)
 ```
 
 ### Agent Tools (Experience Retrieval + Active Help Request)
@@ -305,7 +294,7 @@ When to use:
 - Use `request_human_intervention` when the agent is blocked, uncertain, or needs clarification.
 
 ```python
-from toolbrain_tracing.sdk import (
+from tracebrain.sdk import (
     search_past_experiences,
     search_similar_traces,
     request_human_intervention,
@@ -323,7 +312,7 @@ help_request = request_human_intervention("User request is ambiguous, need clari
 
 ### Building a Custom Converter
 
-ToolBrain uses the **ToolBrain OTLP (OpenTelemetry Protocol) format** - a delta-based trace schema with parent_id chains for conversation reconstruction.
+TraceBrain uses the **TraceBrain OTLP (OpenTelemetry Protocol) format** - a delta-based trace schema with parent_id chains for conversation reconstruction.
 
 See [docs/Converter.md](docs/Converter.md) for:
 - OTLP schema explanation (parent_id, new_content, delta-based design)
@@ -335,7 +324,7 @@ See [docs/Converter.md](docs/Converter.md) for:
 ```python
 import uuid
 
-from toolbrain_tracing.core.schema import ToolBrainAttributes, SpanType
+from tracebrain.core.schema import TraceBrainAttributes, SpanType
 
 def convert_my_agent_to_otlp(agent_data):
     spans = []
@@ -346,9 +335,9 @@ def convert_my_agent_to_otlp(agent_data):
             "parent_id": parent_id,  # Chain spans together
             "name": step.action,
             "attributes": {
-                ToolBrainAttributes.SPAN_TYPE: SpanType.LLM_INFERENCE,
-                ToolBrainAttributes.LLM_NEW_CONTENT: step.output,  # Delta content only
-                ToolBrainAttributes.TOOL_NAME: step.tool_name,
+                TraceBrainAttributes.SPAN_TYPE: SpanType.LLM_INFERENCE,
+                TraceBrainAttributes.LLM_NEW_CONTENT: step.output,  # Delta content only
+                TraceBrainAttributes.TOOL_NAME: step.tool_name,
             }
         })
         parent_id = spans[-1]["span_id"]
@@ -358,9 +347,9 @@ def convert_my_agent_to_otlp(agent_data):
 ## 📁 Project Structure
 
 ```
-toolbrain-tracing/
+tracebrain-tracing/
 ├── src/
-│   ├── toolbrain_tracing/          # Main package
+│   ├── tracebrain/          # Main package
 │   │   ├── api/v1/                 # FastAPI REST endpoints
 │   │   ├── core/                   # TraceStore, schema, agent logic
 │   │   ├── db/                     # Database session management
@@ -373,7 +362,7 @@ toolbrain-tracing/
 │       ├── app.py                  # Streamlit admin UI
 │       └── seed_tracestore_samples.py  # Sample data seeder
 ├── data/                           # Sample OTLP traces
-│   └── ToolBrain OTLP Trace Samples/
+│   └── TraceBrain OTLP Trace Samples/
 ├── docker/                         # Docker configuration
 │   ├── docker-compose.yml
 │   ├── Dockerfile
@@ -403,17 +392,17 @@ python seed_tracestore_samples.py --backend sqlite
 python seed_tracestore_samples.py \
     --backend postgresql \
     --db-url "postgresql://traceuser:tracepass@localhost:5432/tracedb" \
-    --samples-dir "../../data/ToolBrain OTLP Trace Samples"
+    --samples-dir "../../data/TraceBrain OTLP Trace Samples"
 ```
 
 ### Database Migrations
 
 No migration tooling is included yet. For schema changes:
 
-1. Update models in `src/toolbrain_tracing/db/base.py`
+1. Update models in `src/tracebrain/db/base.py`
 2. Recreate the database:
-    - **SQLite (local):** delete `toolbrain_traces.db`, then run `toolbrain-trace init-db`
-    - **PostgreSQL (Docker):** `docker compose -f docker/docker-compose.yml down -v` then `toolbrain-trace up`
+    - **SQLite (local):** delete `tracebrain_traces.db`, then run `tracebrain-trace init-db`
+    - **PostgreSQL (Docker):** `docker compose -f docker/docker-compose.yml down -v` then `tracebrain-trace up`
 
 ### Working with JSONB Queries (PostgreSQL)
 
@@ -424,7 +413,7 @@ from sqlalchemy import func, cast
 from sqlalchemy.dialects.postgresql import JSONB
 
 # Extract text from JSONB
-span_type = func.jsonb_extract_path_text(Span.attributes, "toolbrain.span.type")
+span_type = func.jsonb_extract_path_text(Span.attributes, "tracebrain.span.type")
 
 # Cast for complex queries
 rating = func.jsonb_extract_path_text(cast(Trace.feedback, JSONB), "rating")
@@ -434,7 +423,7 @@ rating = func.jsonb_extract_path_text(cast(Trace.feedback, JSONB), "rating")
 
 - **[Building Your Own Trace Converter](docs/Converter.md)** - Complete guide for integrating custom agent frameworks
 - **[Trace Reconstruction Guide](docs/Reconstructor.md)** - Rebuild full context from delta traces for training
-- **[Sample OTLP Traces](data/ToolBrain%20OTLP%20Trace%20Samples)** - Example trace files
+- **[Sample OTLP Traces](data/TraceBrain%20OTLP%20Trace%20Samples)** - Example trace files
 - **[API Documentation](http://localhost:8000/docs)** - Interactive OpenAPI docs (when server is running)
 - **[Docker Setup Guide](docker/README.md)** - Docker-specific instructions
 
@@ -459,17 +448,17 @@ Contributions are welcome! Here's how to get started:
 
 ### Docker changes not reflected
 
-If code changes aren't picked up after `toolbrain-trace up --build`:
+If code changes aren't picked up after `tracebrain-trace up --build`:
 
 ```bash
-toolbrain-trace down
+tracebrain-trace down
 docker compose -f docker/docker-compose.yml build --no-cache
-toolbrain-trace up
+tracebrain-trace up
 ```
 
 ### PostgreSQL connection errors
 
-Ensure PostgreSQL is running and check connection string in `src/toolbrain_tracing/config.py`:
+Ensure PostgreSQL is running and check connection string in `src/tracebrain/config.py`:
 
 ```python
 DATABASE_URL = "postgresql://traceuser:tracepass@localhost:5432/tracedb"

@@ -42,7 +42,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
           }}
         >
           <Typography variant="h6" gutterBottom>
-            Welcome to ToolBrain Librarian
+            Welcome to TraceBrain Librarian
           </Typography>
           <Typography variant="body2">Type to get started</Typography>
         </Box>

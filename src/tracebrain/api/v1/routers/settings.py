@@ -1,5 +1,5 @@
 """
-ToolBrain TraceStore REST API Settings Router (v1)
+TraceBrain TraceStore REST API Settings Router (v1)
 
 This router manages application settings.
 
@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Literal
 
-from toolbrain_tracing.constants import SETTINGS_FILE
+from tracebrain.constants import SETTINGS_FILE
 
 router = APIRouter(
     prefix="/settings",

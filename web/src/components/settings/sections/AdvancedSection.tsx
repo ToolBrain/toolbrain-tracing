@@ -70,7 +70,7 @@ const AdvancedSection: React.FC = () => {
       {/* Chat Model */}
       <Stack spacing={3}>
         <Stack spacing={0.5}>
-          <Typography variant="h6">ToolBrain Librarian</Typography>
+          <Typography variant="h6">TraceBrain Librarian</Typography>
           <Typography variant="body2" color="text.secondary">
             Language model used for chat.
           </Typography>

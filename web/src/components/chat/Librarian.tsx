@@ -91,7 +91,7 @@ export const Librarian: React.FC = () => {
                 variant="h6"
                 sx={{ fontWeight: 600, userSelect: "none" }}
               >
-                ToolBrain Librarian
+                TraceBrain Librarian
               </Typography>
             </Stack>
 
