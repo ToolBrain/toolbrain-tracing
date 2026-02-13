@@ -38,7 +38,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-API_BASE_URL = os.getenv("TOOLBRAIN_API_BASE_URL", "http://localhost:8000/api/v1")
+API_BASE_URL = os.getenv("TRACEBRAIN_API_BASE_URL", "http://localhost:8000/api/v1")
 _api_root = API_BASE_URL.rstrip("/")
 if _api_root.endswith("/api/v1"):
     DOCS_URL = _api_root[:-7] + "/docs"
