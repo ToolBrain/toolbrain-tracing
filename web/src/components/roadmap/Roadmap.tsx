@@ -142,10 +142,10 @@ const Roadmap: React.FC = () => {
       >
         <Box sx={{ pb: 2 }}>
           <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
-            Roadmap
+            Training Roadmap
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Generate sample tasks for your agents
+            Browse existing tasks or generate new ones
           </Typography>
         </Box>
 
