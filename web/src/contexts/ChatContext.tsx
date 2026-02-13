@@ -67,7 +67,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setMessages((prev) => [
         ...prev,
         { role: "user", content },
-        { role: "assistant", content: result.answer },
+        { role: "assistant", content: result.answer, sources: result.sources },
       ]);
       setSuggestions(result.suggestions ?? []);
     } catch (err) {
