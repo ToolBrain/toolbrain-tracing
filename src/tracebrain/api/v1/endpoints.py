@@ -5,13 +5,24 @@ This module provides FastAPI router with endpoints for interacting with the Trac
 It exposes endpoints for querying traces, retrieving trace details, and adding feedback.
 
 Features:
+- GET /api/v1/health: Health check
 - GET /api/v1/traces: List all traces with pagination
 - GET /api/v1/traces/{trace_id}: Get detailed trace information
+- POST /api/v1/traces: Ingest a trace
+- POST /api/v1/ops/batch_evaluate: Batch AI evaluation
 - POST /api/v1/traces/{trace_id}/feedback: Add user feedback to a trace
+- POST /api/v1/traces/{trace_id}/signal: Mark a trace as needs review
+- GET /api/v1/traces/search: Semantic experience search
+- GET /api/v1/export/traces: Export traces
+- GET /api/v1/episodes/{episode_id}: Retrieve episode summary
 - GET /api/v1/stats: Get database statistics
 - GET /api/v1/analytics/tool_usage: Get tool usage analytics
+- POST /api/v1/ai_evaluate/{trace_id}: Evaluate a trace with AI judge
 - POST /api/v1/natural_language_query: AI-powered natural language queries
-- GET /api/v1/episodes/{episode_id}/traces: Retrieve all traces belonging to an episode
+- GET /api/v1/librarian_sessions/{session_id}: Retrieve librarian chat history
+- POST /api/v1/curriculum/generate: Generate curriculum tasks
+- GET /api/v1/curriculum: List curriculum tasks
+- GET /api/v1/curriculum/export: Export curriculum tasks
 """
 
 from typing import List, Optional, Dict, Any
