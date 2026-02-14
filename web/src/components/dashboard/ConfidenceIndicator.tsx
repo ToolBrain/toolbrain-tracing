@@ -1,16 +1,24 @@
 import React from "react";
 import { Box, LinearProgress, Typography } from "@mui/material";
-import { CheckCircle, Schedule } from "@mui/icons-material";
+import { CheckCircle, Schedule, VerifiedUser } from "@mui/icons-material";
 
 interface ConfidenceIndicatorProps {
   confidence: number;
-  status: "pending_review" | "completed";
+  status: "pending_review" | "auto_verified" | "completed";
 }
 
 const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
   confidence,
   status,
 }) => {
+  if (confidence === undefined || confidence === null) {
+    return (
+      <Typography variant="body2" color="text.disabled">
+        —
+      </Typography>
+    );
+  }
+
   const percentage = confidence * 100;
   const progressColor =
     confidence < 0.2 ? "error" : confidence < 0.8 ? "warning" : "success";
@@ -41,6 +49,8 @@ const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
 
       {status === "completed" ? (
         <CheckCircle sx={{ fontSize: 16, color: "success.main" }} />
+      ) : status === "auto_verified" ? (
+        <VerifiedUser sx={{ fontSize: 16, color: "success.light" }} />
       ) : (
         <Schedule sx={{ fontSize: 16, color: "warning.main" }} />
       )}

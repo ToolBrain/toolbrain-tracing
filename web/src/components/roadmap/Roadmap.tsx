@@ -8,6 +8,9 @@ import {
   Select,
   MenuItem,
   IconButton,
+  Snackbar,
+  Alert,
+  CircularProgress,
 } from "@mui/material";
 import {
   ArrowDownward,
@@ -56,6 +59,12 @@ const Roadmap: React.FC = () => {
 
   const [tasks, setTasks] = useState<CurriculumTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success" as "success" | "error",
+  });
 
   // initial fetch of tasks
   useEffect(() => {
@@ -77,14 +86,26 @@ const Roadmap: React.FC = () => {
 
   // Handle generate
   const handleGenerate = async () => {
-    setIsLoading(true);
+    setIsGenerating(true);
+
+    setSnackbar({
+      open: true,
+      message: "Curriculum generation started in background",
+      severity: "success",
+    });
+
     try {
       await generateCurriculum();
       await handleRefresh();
     } catch (error) {
       console.error("Error generating curriculum:", error);
+      setSnackbar({
+        open: true,
+        message: "Failed to generate curriculum",
+        severity: "error",
+      });
     } finally {
-      setIsLoading(false);
+      setTimeout(() => setIsGenerating(false), 3000);
     }
   };
 
@@ -257,11 +278,17 @@ const Roadmap: React.FC = () => {
             {/* Generate tasks button */}
             <Button
               variant="contained"
-              startIcon={<AutoAwesome />}
+              startIcon={
+                isGenerating ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <AutoAwesome />
+                )
+              }
               onClick={handleGenerate}
-              disabled={isLoading}
+              disabled={isLoading || isGenerating}
             >
-              Generate
+              {isGenerating ? "Generating..." : "Generate"}
             </Button>
           </Box>
         </Box>
@@ -275,6 +302,20 @@ const Roadmap: React.FC = () => {
       >
         <CurriculumList tasks={sortedTasks} isLoading={isLoading} />
       </Box>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

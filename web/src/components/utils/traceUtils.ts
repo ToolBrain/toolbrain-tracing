@@ -13,5 +13,5 @@ export function traceGetPriority(trace: Trace) {
 }
 
 export function traceGetEvaluation(trace: Trace) {
-  return trace?.attributes["tracebrain.trace.ai_evaluation"];
+  return trace?.attributes["tracebrain.ai_evaluation"];
 }

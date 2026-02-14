@@ -23,7 +23,11 @@ import type { Trace } from "../../types/trace";
 import React from "react";
 import { spanGetOutput, spanHasError } from "../utils/spanUtils";
 import StatusChip, { ALLOWED_STATUSES, type ChipStatus } from "./StatusChip";
-import { traceGetPriority, traceGetStatus } from "../utils/traceUtils";
+import {
+  traceGetEvaluation,
+  traceGetPriority,
+  traceGetStatus,
+} from "../utils/traceUtils";
 import ConfidenceIndicator from "./ConfidenceIndicator";
 
 interface TraceListProps {
@@ -150,8 +154,9 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
               const status = getTraceStatus(trace);
               const priority = traceGetPriority(trace);
 
-              const confidence = 1;
-              const suggestion_status = "pending_review";
+              const evaluation = traceGetEvaluation(trace);
+              const confidence = evaluation?.confidence;
+              const suggestion_status = evaluation?.status;
 
               return (
                 <React.Fragment key={trace.trace_id}>

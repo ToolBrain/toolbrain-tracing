@@ -8,6 +8,9 @@ import {
   InputLabel,
   IconButton,
   Button,
+  Snackbar,
+  Alert,
+  CircularProgress,
 } from "@mui/material";
 import {
   Search,
@@ -44,12 +47,31 @@ const MainContent: React.FC<MainContentProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("datetime");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success" as "success" | "error",
+  });
 
   const handleEvaluateTraces = async () => {
+    setIsEvaluating(true);
     try {
       await batchEvaluateTraces();
+      setSnackbar({
+        open: true,
+        message: "Batch evaluation started in background",
+        severity: "success",
+      });
     } catch (error: any) {
       console.error("Failed to start batch evaluation:", error);
+      setSnackbar({
+        open: true,
+        message: "Failed to start evaluation",
+        severity: "error",
+      });
+    } finally {
+      setTimeout(() => setIsEvaluating(false), 3000);
     }
   };
 
@@ -158,17 +180,24 @@ const MainContent: React.FC<MainContentProps> = ({
         </Button>
 
         <Button
-          variant="outlined"
+          variant="contained"
           onClick={handleEvaluateTraces}
+          disabled={isEvaluating}
           size="small"
-          startIcon={<PlaylistAddCheck />}
+          startIcon={
+            isEvaluating ? (
+              <CircularProgress size={16} color="inherit" />
+            ) : (
+              <PlaylistAddCheck />
+            )
+          }
           sx={{
             borderRadius: "4px",
             height: "40px",
             fontWeight: 600,
           }}
         >
-          Evaluate Traces
+          {isEvaluating ? "Evaluating..." : "Evaluate Traces"}
         </Button>
 
         <TextField
@@ -203,6 +232,20 @@ const MainContent: React.FC<MainContentProps> = ({
       </Box>
 
       <TraceList traces={sortedTraces} />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
