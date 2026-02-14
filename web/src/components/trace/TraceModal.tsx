@@ -85,7 +85,7 @@ const TraceModal: React.FC<TraceModalProps> = ({
         setError("");
         try {
           const data = await evaluateTrace(id, settings.llm.model);
-          setRating(Math.max(1, data.rating));
+          setRating(data.rating);
           setFeedback(data.feedback);
         } catch (error: any) {
           console.error("Failed to fetch evaluation:", error);
@@ -109,7 +109,7 @@ const TraceModal: React.FC<TraceModalProps> = ({
 
   useEffect(() => {
     if (type === "feedback" && evaluation) {
-      setRating(Math.max(1, evaluation.rating));
+      setRating(evaluation.rating);
       setFeedback(evaluation.feedback);
     }
   }, [evaluation]);
@@ -119,7 +119,7 @@ const TraceModal: React.FC<TraceModalProps> = ({
     setLoading(true);
     evaluateTrace(id, settings.llm.model)
       .then((data) => {
-        setRating(Math.max(1, data.rating));
+        setRating(data.rating);
         setFeedback(data.feedback);
       })
       .catch((error: any) => {
