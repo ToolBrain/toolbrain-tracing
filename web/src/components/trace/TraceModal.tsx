@@ -11,8 +11,9 @@ import {
   Alert,
   Checkbox,
   FormControlLabel,
+  Tooltip,
 } from "@mui/material";
-import { Close, ErrorOutline } from "@mui/icons-material";
+import { Close, ErrorOutline, HelpOutline } from "@mui/icons-material";
 import FeedbackForm from "./FeedbackForm";
 import {
   submitTraceFeedback,
@@ -27,6 +28,32 @@ interface TraceModalProps {
   type: "feedback" | "evaluate";
   id: string;
 }
+
+const ReviewToggle = ({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) => (
+  <Box display="flex" alignItems="center" gap={0.5}>
+    <FormControlLabel
+      control={
+        <Checkbox
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+      }
+      label="Mark for review"
+      sx={{ mr: 0 }}
+    />
+    <Tooltip title="Flag this trace for automated task generation." arrow>
+      <IconButton size="small">
+        <HelpOutline fontSize="small" />
+      </IconButton>
+    </Tooltip>
+  </Box>
+);
 
 const TraceModal: React.FC<TraceModalProps> = ({ open, onClose, type, id }) => {
   const [rating, setRating] = useState<number | null>(null);
@@ -112,14 +139,9 @@ const TraceModal: React.FC<TraceModalProps> = ({ open, onClose, type, id }) => {
             />
 
             {rating !== null && rating <= 2 && (
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={markForReview}
-                    onChange={(e) => setMarkForReview(e.target.checked)}
-                  />
-                }
-                label="Mark for review"
+              <ReviewToggle
+                checked={markForReview}
+                onChange={setMarkForReview}
               />
             )}
           </Box>
@@ -229,14 +251,9 @@ const TraceModal: React.FC<TraceModalProps> = ({ open, onClose, type, id }) => {
             />
 
             {rating !== null && rating <= 2 && (
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={markForReview}
-                    onChange={(e) => setMarkForReview(e.target.checked)}
-                  />
-                }
-                label="Mark for review"
+              <ReviewToggle
+                checked={markForReview}
+                onChange={setMarkForReview}
               />
             )}
           </Box>
