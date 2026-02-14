@@ -141,6 +141,7 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
               const startTime = getTraceStartTime(trace);
               const duration = getTraceDuration(trace);
               const status = getTraceStatus(trace);
+              const priority = traceGetPriority(trace);
 
               return (
                 <React.Fragment key={trace.trace_id}>
@@ -191,9 +192,16 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
                         {"\t"}
                         <Flag
                           fontSize="inherit"
-                          sx={{ color: "error.light" }}
+                          sx={{
+                            color:
+                              priority >= 4
+                                ? "error.main" // (4-5) High priority
+                                : priority >= 3
+                                  ? "warning.main" // (3) Medium priority
+                                  : "error.light", // (1-2) Low priority
+                          }}
                         />
-                        {traceGetPriority(trace)}
+                        {priority}
                       </Typography>
                     </TableCell>
                     <TableCell
