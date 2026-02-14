@@ -300,6 +300,12 @@ class TraceIngestResponse(BaseModel):
     message: str = Field(..., description="Status message")
 
 
+class TraceInitIn(BaseModel):
+    trace_id: str = Field(..., description="Unique trace identifier")
+    episode_id: Optional[str] = Field(None, description="Episode identifier")
+    system_prompt: Optional[str] = Field(None, description="System prompt used by the agent")
+
+
 def _trace_to_out(trace) -> TraceOut:
     span_outs = [SpanOut.model_validate(span) for span in trace.spans]
 
@@ -341,6 +347,7 @@ def root():
             "list_traces": "GET /api/v1/traces",
             "get_trace": "GET /api/v1/traces/{trace_id}",
             "ingest_trace": "POST /api/v1/traces",
+            "init_trace": "POST /api/v1/traces/init",
             "add_feedback": "POST /api/v1/traces/{trace_id}/feedback",
             "signal_trace": "POST /api/v1/traces/{trace_id}/signal",
             "search_traces": "GET /api/v1/traces/search",
@@ -525,6 +532,26 @@ def ingest_trace(trace: TraceIn):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to store trace: {str(e)}")
+
+
+@router.post("/traces/init", response_model=TraceIngestResponse, status_code=status.HTTP_201_CREATED, tags=["Traces"])
+def init_trace(trace: TraceInitIn):
+    """Pre-register a trace before spans are available."""
+    try:
+        trace_id = store.init_trace(
+            trace_id=trace.trace_id,
+            episode_id=trace.episode_id,
+            system_prompt=trace.system_prompt,
+        )
+        return TraceIngestResponse(
+            success=True,
+            trace_id=trace_id,
+            message="Trace initialized successfully",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to initialize trace: {str(e)}")
 
 
 @router.post("/traces/{trace_id}/feedback", response_model=FeedbackResponse, tags=["Feedback"])
