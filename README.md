@@ -2,7 +2,9 @@
 
 **TraceBrain** is a comprehensive trace management platform purpose-built for the era of Agentic AI.
 
-As AI agents become increasingly autonomous and operationally complex, TraceBrain provides the infrastructure required to **observe**, **govern**, and **continuously refine** agentic workflows. Rather than functioning as a passive logging system, it establishes an active, closed-loop environment where operational traces are systematically collected, standardized, and transformed into actionable insights—enabling agents to improve from historical execution data while allowing human operators to retain oversight and control.
+As AI agents become increasingly autonomous and operationally complex, TraceBrain provides the infrastructure to observe, govern, and continuously refine agentic workflows. Rather than serving as a passive logging system, it creates an active, closed-loop environment where execution traces are systematically collected, standardized, and converted into actionable insights.
+
+This enables agents to learn from historical execution data while ensuring that human operators maintain visibility, oversight, and control.
 
 ## ✨ Key Features
 
@@ -289,6 +291,26 @@ messages = TraceClient.to_messages(trace_data)
 turns = TraceClient.to_turns(trace_data)
 tracebrain_turns = TraceClient.to_tracebrain_turns(trace_data)
 ```
+
+### Trace Init and trace_scope (for Active Help Request)
+
+Use `trace_scope` when your agent might call `request_human_intervention` during
+execution. It pre-registers a trace via `/api/v1/traces/init` and sets
+`TRACEBRAIN_TRACE_ID` so the help signal attaches to the right trace.
+
+```python
+from tracebrain import TraceClient
+from tracebrain.sdk import request_human_intervention
+
+client = TraceClient(base_url="http://localhost:8000")
+
+with client.trace_scope(system_prompt="You are a helpful assistant"):
+    # Run your agent logic here
+    request_human_intervention("Need clarification on user requirements")
+```
+
+If you do not use Active Help Request, you can skip `trace_scope` and log the
+trace at the end as usual.
 
 ### Agent Tools (Experience Retrieval + Active Help Request)
 
