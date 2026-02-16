@@ -1,19 +1,14 @@
-import React, { useState } from "react";
-import { Box, Typography, IconButton, Button } from "@mui/material";
+import React from "react";
+import { Box, Typography, IconButton } from "@mui/material";
 import {
   ChevronRight,
   ExpandMore,
   ErrorOutline,
   CheckCircleOutline,
   Schedule,
-  ThumbUpOutlined,
-  AutoAwesome,
 } from "@mui/icons-material";
 import type { Span, Trace } from "../../types/trace";
-import TraceModal from "./TraceModal";
-import { useParams } from "react-router-dom";
 import { spanHasError } from "../utils/spanUtils";
-import { traceGetLatestFeedback } from "../utils/traceUtils";
 
 interface TraceTreeProps {
   traces: Trace[];
@@ -30,11 +25,6 @@ const TraceTree: React.FC<TraceTreeProps> = ({
   onToggleExpand,
   onSelectSpan,
 }) => {
-  const [openModal, setOpenModal] = useState<"feedback" | "evaluate" | null>(
-    null,
-  );
-  const { id } = useParams<{ id: string }>() as { id: string };
-
   const getDuration = (span: Span) => {
     const ms =
       new Date(span.end_time).getTime() - new Date(span.start_time).getTime();
@@ -202,44 +192,6 @@ const TraceTree: React.FC<TraceTreeProps> = ({
         })}
       </Box>
 
-      <Box
-        sx={{
-          p: 1.5,
-          borderTop: 1,
-          borderColor: "divider",
-          display: "flex",
-          gap: 1,
-          justifyContent: "end",
-          flexWrap: "wrap",
-        }}
-      >
-        <Button
-          variant="outlined"
-          size="medium"
-          startIcon={<ThumbUpOutlined fontSize="small" />}
-          onClick={() => setOpenModal("feedback")}
-        >
-          Feedback
-        </Button>
-        <Button
-          variant="outlined"
-          size="medium"
-          startIcon={<AutoAwesome fontSize="small" />}
-          onClick={() => setOpenModal("evaluate")}
-        >
-          AI Evaluate
-        </Button>
-      </Box>
-
-      {openModal && (
-        <TraceModal
-          open={true}
-          onClose={() => setOpenModal(null)}
-          type={openModal}
-          id={id}
-          feedback={traceGetLatestFeedback(traces[0])}
-        />
-      )}
     </Box>
   );
 };

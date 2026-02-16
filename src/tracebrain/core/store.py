@@ -600,19 +600,41 @@ class BaseStorageBackend:
         """Add or update feedback for a trace."""
         session = self.get_session()
         try:
-            updated = (
-                session.query(Trace)
-                .filter(Trace.id == trace_id)
-                .update({"feedback": feedback_data})
-            )
-            if updated == 0:
-                raise ValueError(f"Trace with ID '{trace_id}' not found")
+            trace = session.query(Trace).filter(Trace.id == trace_id).first()
+            if not trace:
+                raise ValueError(f"Trace not found: {trace_id}")
+            trace.feedback = feedback_data
+            trace.status = TraceStatus.completed
+            if isinstance(trace.attributes, dict):
+                trace.attributes["tracebrain.trace.status"] = TraceStatus.completed.value
+            else:
+                trace.attributes = {"tracebrain.trace.status": TraceStatus.completed.value}
             session.commit()
             logger.info("Added feedback to trace %s", trace_id)
             return True
         except Exception:
             session.rollback()
             logger.exception("Failed to add feedback")
+            raise
+        finally:
+            session.close()
+
+    def update_ai_evaluation(self, trace_id: str, ai_evaluation: Dict[str, Any]) -> None:
+        """Update AI evaluation metadata for a trace."""
+        session = self.get_session()
+        try:
+            trace = session.query(Trace).filter(Trace.id == trace_id).first()
+            if not trace:
+                raise ValueError(f"Trace with ID '{trace_id}' not found")
+            trace.ai_evaluation = dict(ai_evaluation)
+            if isinstance(trace.attributes, dict):
+                trace.attributes["tracebrain.ai_evaluation"] = dict(ai_evaluation)
+            else:
+                trace.attributes = {"tracebrain.ai_evaluation": dict(ai_evaluation)}
+            session.commit()
+        except Exception:
+            session.rollback()
+            logger.exception("Failed to update AI evaluation")
             raise
         finally:
             session.close()
