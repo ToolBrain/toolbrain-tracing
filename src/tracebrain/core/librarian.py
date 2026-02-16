@@ -17,39 +17,59 @@ import sqlparse
 
 from tracebrain.config import settings
 from tracebrain.core.llm_providers import select_provider, is_provider_available, BaseProvider
+from tracebrain.core.schema import TraceBrainAttributes
 
 logger = logging.getLogger(__name__)
 
 
-SCHEMA_CONTEXT = """
-PostgreSQL schema (read-only):
+def _build_schema_context() -> str:
+    ai_eval_key = TraceBrainAttributes.AI_EVALUATION.value
+    ai_conf = TraceBrainAttributes.AI_CONFIDENCE.value
+    ai_rating = TraceBrainAttributes.AI_RATING.value
+    ai_status = TraceBrainAttributes.AI_STATUS.value
+    ai_feedback = TraceBrainAttributes.AI_FEEDBACK.value
+    span_type = TraceBrainAttributes.SPAN_TYPE.value
+    tool_name = TraceBrainAttributes.TOOL_NAME.value
 
-Table: traces
-- id (string, primary key)
-- system_prompt (text)
-- episode_id (string)
-- created_at (timestamp)
-- feedback (jsonb)
+    return (
+        "PostgreSQL schema (read-only):\n\n"
+        "Table: traces\n"
+        "- id (string, primary key)\n"
+        "- system_prompt (text)\n"
+        "- episode_id (string)\n"
+        "- created_at (timestamp)\n"
+        "- feedback (jsonb)\n"
+        "- attributes (jsonb)\n\n"
+        "Table: spans\n"
+        "- id (integer, primary key)\n"
+        "- span_id (string)\n"
+        "- trace_id (string, foreign key -> traces.id)\n"
+        "- parent_id (string)\n"
+        "- name (string)\n"
+        "- start_time (timestamp)\n"
+        "- end_time (timestamp)\n"
+        "- attributes (jsonb)\n\n"
+        "AI Evaluation object:\n"
+        f"- traces.attributes contains '{ai_eval_key}' (JSONB object)\n"
+        f"  - '{ai_rating}': integer (1-5)\n"
+        f"  - '{ai_conf}': float (0.0-1.0). High uncertainty is < 0.5\n"
+        f"  - '{ai_status}': string (pending_review, auto_verified, completed)\n"
+        f"  - '{ai_feedback}': string (AI rationale)\n\n"
+        "JSONB usage examples (use ->> for text comparisons):\n"
+        f"- spans.attributes->>'{span_type}'\n"
+        f"- spans.attributes->>'{tool_name}'\n"
+        "- spans.attributes->>'otel.status_code'\n"
+        "- traces.feedback->>'rating'\n"
+        f"- traces.attributes->'{ai_eval_key}'->>'{ai_conf}'\n\n"
+        "Advanced SQL examples:\n"
+        f"- Uncertainty query: SELECT id FROM traces WHERE (attributes->'{ai_eval_key}'->>'{ai_conf}')::float < 0.5\n"
+        f"- Feedback search: SELECT id FROM traces WHERE attributes->'{ai_eval_key}'->>'{ai_feedback}' ILIKE '%loop%'\n"
+        "- Time filter: created_at > now() - interval '24 hours'\n"
+        "- Metadata join: spans.trace_id = traces.id\n"
+    ).strip()
 
-Table: spans
-- id (integer, primary key)
-- span_id (string)
-- trace_id (string, foreign key -> traces.id)
-- parent_id (string)
-- name (string)
-- start_time (timestamp)
-- end_time (timestamp)
-- attributes (jsonb)
 
-JSONB usage examples:
-- spans.attributes->>'tracebrain.span.type'
-- spans.attributes->>'tracebrain.tool.name'
-- spans.attributes->>'otel.status_code'
-- traces.feedback->>'rating'
-
-Join examples:
-- spans.trace_id = traces.id
-""".strip()
+SCHEMA_CONTEXT = _build_schema_context()
 
 
 def _build_tool_specs() -> List[Dict[str, Any]]:
