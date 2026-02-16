@@ -45,6 +45,7 @@ const TraceVisualizer: React.FC<TraceVisualizerProps> = ({ traces }) => {
   const allSpans = traces.flatMap((t) => t.spans);
   const selectedSpanData =
     allSpans.find((s) => s.span_id === selectedSpan) || null;
+  const activeTrace = traces.length > 0 ? traces[0] : null;
 
   return (
     <Box sx={{ display: "flex", height: "100%" }}>
@@ -55,7 +56,7 @@ const TraceVisualizer: React.FC<TraceVisualizerProps> = ({ traces }) => {
         onToggleExpand={toggleExpand}
         onSelectSpan={setSelectedSpan}
       />
-      <SpanDetails span={selectedSpanData} />
+      <SpanDetails span={selectedSpanData} trace={activeTrace} />
     </Box>
   );
 };

@@ -32,7 +32,7 @@ import logging
 import uuid
 import json
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status, BackgroundTasks
 from fastapi.responses import Response
 from pydantic import BaseModel, Field, field_serializer, ConfigDict
 
@@ -66,6 +66,29 @@ def get_librarian_agent():
     if _librarian_agent is None:
         _librarian_agent = LibrarianAgent(store)
     return _librarian_agent
+
+
+def _build_ai_evaluation(result: Dict[str, Any]) -> Dict[str, Any]:
+    confidence = float(result.get("confidence", 0.0))
+    status_value = "auto_verified" if confidence > 0.8 else "pending_review"
+    return {
+        "rating": result.get("rating"),
+        "feedback": result.get("feedback"),
+        "confidence": confidence,
+        "status": status_value,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+def run_bg_evaluation(trace_id: str) -> None:
+    try:
+        judge_model_id = settings.LLM_MODEL or "gemini-1.5-flash"
+        judge = AIJudge(store)
+        result = judge.evaluate(trace_id, judge_model_id)
+        ai_eval = _build_ai_evaluation(result)
+        store.update_ai_evaluation(trace_id, ai_eval)
+    except Exception as exc:
+        logger.error("Background evaluation failed for %s: %s", trace_id, exc)
 
 
 # ============================================================================
@@ -551,12 +574,16 @@ def get_trace(trace_id: str):
 
 
 @router.post("/traces", response_model=TraceIngestResponse, status_code=status.HTTP_201_CREATED, tags=["Traces"])
-def ingest_trace(trace: TraceIn):
+def ingest_trace(trace: TraceIn, background_tasks: BackgroundTasks):
     """
     Ingest a trace into the TraceStore.
     """
     try:
-        trace_id = store.add_trace_from_dict(trace.model_dump())
+        trace_payload = trace.model_dump()
+        trace_id = store.add_trace_from_dict(trace_payload)
+        attributes = trace_payload.get("attributes") or {}
+        if not attributes.get("tracebrain.ai_evaluation"):
+            background_tasks.add_task(run_bg_evaluation, trace_id)
         return TraceIngestResponse(
             success=True,
             trace_id=trace_id,
@@ -668,26 +695,16 @@ def batch_evaluate_traces(
         for trace in traces:
             try:
                 result = judge.evaluate(trace.id, settings.LLM_MODEL)
-                confidence = float(result["confidence"])
-                status_value = "auto_verified" if confidence > 0.8 else "pending_review"
-                ai_eval = {
-                    "rating": result["rating"],
-                    "feedback": result["feedback"],
-                    "confidence": confidence,
-                    "status": status_value,
-                    "timestamp": datetime.utcnow().isoformat(),
-                }
-                trace.ai_evaluation = dict(ai_eval)
+                ai_eval = _build_ai_evaluation(result)
+                store.update_ai_evaluation(trace.id, ai_eval)
                 processed += 1
             except Exception as exc:
                 failed += 1
                 logger.exception("Batch evaluate failed for trace %s", trace.id)
                 errors.append({"trace_id": trace.id, "error": str(exc)})
 
-        session.commit()
         return {"success": True, "processed": processed, "failed": failed, "errors": errors}
     except Exception as e:
-        session.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to batch evaluate traces: {str(e)}")
     finally:
         session.close()
@@ -976,26 +993,8 @@ def evaluate_trace_with_ai(trace_id: str, payload: AIEvaluationIn):
         judge = AIJudge(store)
         result = judge.evaluate(trace_id, payload.judge_model_id)
 
-        confidence = float(result.get("confidence", 0.0))
-        status_value = "auto_verified" if confidence > 0.8 else "pending_review"
-        timestamp = datetime.utcnow().isoformat()
-        ai_eval = {
-            "rating": result.get("rating"),
-            "feedback": result.get("feedback"),
-            "confidence": confidence,
-            "status": status_value,
-            "timestamp": timestamp,
-        }
-
-        session = store.get_session()
-        try:
-            trace = session.query(Trace).filter(Trace.id == trace_id).first()
-            if not trace:
-                raise HTTPException(status_code=404, detail="Trace not found")
-            trace.ai_evaluation = dict(ai_eval)
-            session.commit()
-        finally:
-            session.close()
+        ai_eval = _build_ai_evaluation(result)
+        store.update_ai_evaluation(trace_id, ai_eval)
 
         return AIEvaluationOut(**ai_eval)
 

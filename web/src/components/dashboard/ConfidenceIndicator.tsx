@@ -1,10 +1,10 @@
 import React from "react";
-import { Box, LinearProgress, Typography } from "@mui/material";
+import { Box, LinearProgress, Typography, CircularProgress } from "@mui/material";
 import { CheckCircle, Schedule, VerifiedUser } from "@mui/icons-material";
 
 interface ConfidenceIndicatorProps {
-  confidence: number;
-  status: "pending_review" | "auto_verified" | "completed";
+  confidence?: number | null;
+  status?: "pending_review" | "auto_verified" | "completed" | null;
 }
 
 const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
@@ -13,15 +13,20 @@ const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
 }) => {
   if (confidence === undefined || confidence === null) {
     return (
-      <Typography variant="body2" color="text.disabled">
-        —
-      </Typography>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <CircularProgress size={14} thickness={5} />
+        <Typography variant="body2" color="text.disabled">
+          Analyzing...
+        </Typography>
+      </Box>
     );
   }
 
   const percentage = confidence * 100;
   const progressColor =
     confidence < 0.2 ? "error" : confidence < 0.8 ? "warning" : "success";
+
+  const resolvedStatus = status ?? "pending_review";
 
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
@@ -47,9 +52,9 @@ const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
         {percentage.toFixed(0)}%
       </Typography>
 
-      {status === "completed" ? (
+      {resolvedStatus === "completed" ? (
         <CheckCircle sx={{ fontSize: 16, color: "success.main" }} />
-      ) : status === "auto_verified" ? (
+      ) : resolvedStatus === "auto_verified" ? (
         <VerifiedUser sx={{ fontSize: 16, color: "success.light" }} />
       ) : (
         <Schedule sx={{ fontSize: 16, color: "warning.main" }} />
