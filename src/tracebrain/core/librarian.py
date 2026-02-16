@@ -130,6 +130,9 @@ class LibrarianAgent:
         return (
             "You are the TraceBrain AI Librarian, an expert in Agent Operations (AgentOps). "
             "Your task is to analyze agent execution traces to help human experts diagnose issues.\n\n"
+            "NEVER show raw SQL queries or technical tool outputs to the end-user in the 'answer' field. "
+            "Your final response MUST ALWAYS be a valid JSON object with 'answer', 'suggestions', and 'sources' keys. "
+            "The 'answer' should be a natural language summary of what you found in the database.\n\n"
             
             "### CORE TOOLS:\n"
             "1. run_sql_query: Use this for counts, status filters, time-based queries, and metadata analysis.\n"
@@ -385,6 +388,8 @@ class LibrarianAgent:
 
         session = provider.start_chat(system_prompt, self.tools)
         response = provider.send_user_message(session, user_content)
+        last_sql_result: Optional[str] = None
+        saw_sql_result = False
 
         for _ in range(3):
             tool_calls = provider.extract_tool_calls(response)
@@ -397,6 +402,9 @@ class LibrarianAgent:
                 if tool_name == "run_sql_query":
                     sql_query = args.get("query", "")
                     tool_result = self.run_sql_query(sql_query)
+                    if not tool_result.startswith("EXECUTION_FAILED") and not tool_result.startswith("EMPTY_RESULT"):
+                        last_sql_result = tool_result
+                        saw_sql_result = True
                     self.store.save_chat_message(
                         session_id,
                         "tool",
@@ -437,11 +445,32 @@ class LibrarianAgent:
                     self.store.save_chat_message(session_id, "assistant", result["answer"])
                     return result
 
+        if saw_sql_result and last_sql_result:
+            response = provider.send_user_message(
+                session,
+                (
+                    "Using the SQL results below, return ONLY a JSON object with keys "
+                    "answer, suggestions, sources. The answer must be a natural language summary.\n"
+                    f"SQL_RESULTS: {last_sql_result}"
+                ),
+            )
+
         answer_text = provider.extract_text(response)
         try:
             parsed = self._extract_json(answer_text)
         except Exception:
             parsed = {"answer": answer_text, "suggestions": [], "sources": None}
+
+        if self._extract_sql(str(parsed.get("answer", "")) or answer_text):
+            response = provider.send_user_message(
+                session,
+                "Do not return SQL. Summarize the findings in natural language and return JSON only.",
+            )
+            answer_text = provider.extract_text(response)
+            try:
+                parsed = self._extract_json(answer_text)
+            except Exception:
+                parsed = {"answer": answer_text, "suggestions": [], "sources": None}
 
         answer = str(parsed.get("answer", "")).strip() or "No response."
         suggestions = self._normalize_suggestions(parsed.get("suggestions"))
