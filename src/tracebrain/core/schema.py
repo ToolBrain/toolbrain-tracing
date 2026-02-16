@@ -25,6 +25,7 @@ class TraceBrainAttributes(str, Enum):
     # --- Trace Level Attributes (Top level) ---
     SYSTEM_PROMPT = "system_prompt"
     EPISODE_ID = "tracebrain.episode.id"
+    AI_EVALUATION = "tracebrain.ai_evaluation"
 
     # --- LLM Inference Attributes ---
     # Stores only new messages in this turn (JSON string)
@@ -40,6 +41,12 @@ class TraceBrainAttributes(str, Enum):
     TOOL_NAME = "tracebrain.tool.name"
     TOOL_INPUT = "tracebrain.tool.input"
     TOOL_OUTPUT = "tracebrain.tool.output"
+
+    # --- AI Evaluation Sub-Fields ---
+    AI_CONFIDENCE = "confidence"
+    AI_RATING = "rating"
+    AI_STATUS = "status"
+    AI_FEEDBACK = "feedback"
 
 class SpanType(str, Enum):
     """Allowed values for tracebrain.span.type"""

@@ -11,6 +11,7 @@ import re
 
 from sqlalchemy import func, cast, Integer
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import selectinload
 
 from tracebrain.core.llm_providers import select_provider, ProviderError
 from tracebrain.db.base import Trace, CurriculumTask, TraceStatus
@@ -31,7 +32,7 @@ class CurriculumCurator:
     def find_failed_traces(self, limit: int = 20) -> List[Trace]:
         session = self.store.get_session()
         try:
-            query = session.query(Trace)
+            query = session.query(Trace).options(selectinload(Trace.spans))
             if not self.store.is_sqlite:
                 rating_value = cast(
                     func.jsonb_extract_path_text(cast(Trace.feedback, JSONB), "rating"),
