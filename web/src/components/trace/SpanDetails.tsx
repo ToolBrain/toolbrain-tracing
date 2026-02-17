@@ -28,6 +28,7 @@ import {
 } from "../utils/spanUtils";
 import { traceGetEvaluation } from "../utils/traceUtils";
 import { submitTraceFeedback } from "../utils/api";
+import StatusChip from "../dashboard/StatusChip";
 
 interface SpanDetailsProps {
   span: Span | null;
@@ -51,24 +52,23 @@ const SpanDetails: React.FC<SpanDetailsProps> = ({ span, trace }) => {
 
   const [expertRating, setExpertRating] = useState<number | null>(null);
   const [expertComment, setExpertComment] = useState("");
-  const [hasEdited, setHasEdited] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [successOpen, setSuccessOpen] = useState(false);
   const [showEvaluation, setShowEvaluation] = useState(true);
 
   useEffect(() => {
-    setHasEdited(false);
     setSubmitError("");
     setSuccessOpen(false);
+    setExpertRating(aiRating);
+    setExpertComment(aiFeedback);
   }, [trace?.trace_id]);
 
   useEffect(() => {
     if (!trace) return;
-    if (hasEdited) return;
     setExpertRating(aiRating);
     setExpertComment(aiFeedback);
-  }, [trace, aiRating, aiFeedback, hasEdited]);
+  }, [trace, aiRating, aiFeedback]);
 
   const handleSubmit = async () => {
     if (!trace || expertRating === null) return;
@@ -77,7 +77,6 @@ const SpanDetails: React.FC<SpanDetailsProps> = ({ span, trace }) => {
     try {
       await submitTraceFeedback(trace.trace_id, expertRating, expertComment);
       setSuccessOpen(true);
-      setHasEdited(false);
     } catch (error: any) {
       setSubmitError(error?.message || "Failed to submit validation.");
     } finally {
@@ -94,7 +93,11 @@ const SpanDetails: React.FC<SpanDetailsProps> = ({ span, trace }) => {
           ? "warning"
           : "success";
 
-  const matchesAiSuggestion = Boolean(evaluation) && !hasEdited;
+  const matchesAISuggestion =
+    !!evaluation && expertRating === aiRating && expertComment === aiFeedback;
+
+  const hasEdited =
+    !!evaluation && (expertRating !== aiRating || expertComment !== aiFeedback);
 
   // Capturing JSON span attributes
   const spanType = span ? spanGetType(span) : "unknown";
@@ -148,9 +151,7 @@ const SpanDetails: React.FC<SpanDetailsProps> = ({ span, trace }) => {
             display: "grid",
             gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
             gap: 2,
-            alignItems: "stretch",
-            flex: { xs: "0 0 auto", md: "0 0 320px" },
-            minHeight: { xs: "auto", md: 320 },
+            alignItems: "start",
           }}
         >
           <Box
@@ -163,7 +164,6 @@ const SpanDetails: React.FC<SpanDetailsProps> = ({ span, trace }) => {
               display: "flex",
               flexDirection: "column",
               gap: 2,
-              height: "100%",
             }}
           >
             <Box
@@ -176,7 +176,17 @@ const SpanDetails: React.FC<SpanDetailsProps> = ({ span, trace }) => {
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 AI-Generated Assessment
               </Typography>
-              <Chip label="AI Draft" size="small" />
+              <Chip
+                label="AI Draft"
+                size="small"
+                color="primary"
+                sx={{
+                  borderColor: "divider",
+                  border: "1px solid",
+                  p: 1,
+                  borderRadius: 2,
+                }}
+              />
             </Box>
 
             {aiConfidence === null ? (
@@ -216,7 +226,9 @@ const SpanDetails: React.FC<SpanDetailsProps> = ({ span, trace }) => {
                       <LinearProgress
                         variant="determinate"
                         value={(aiConfidence ?? 0) * 100}
-                        color={confidenceColor as "error" | "warning" | "success"}
+                        color={
+                          confidenceColor as "error" | "warning" | "success"
+                        }
                         sx={{ height: 6, borderRadius: 2 }}
                       />
                     </Box>
@@ -236,9 +248,9 @@ const SpanDetails: React.FC<SpanDetailsProps> = ({ span, trace }) => {
                 </Box>
 
                 {aiStatus && (
-                  <Typography variant="caption" color="text.secondary">
-                    Status: {aiStatus}
-                  </Typography>
+                  <Box>
+                    <StatusChip status={aiStatus} />
+                  </Box>
                 )}
               </>
             )}
@@ -254,34 +266,30 @@ const SpanDetails: React.FC<SpanDetailsProps> = ({ span, trace }) => {
               display: "flex",
               flexDirection: "column",
               gap: 2,
-              height: "100%",
             }}
           >
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              Expert Validation
+              Reviewer Validation
             </Typography>
 
-            {matchesAiSuggestion && (
+            {matchesAISuggestion && (
               <Typography variant="caption" color="success.main">
                 Matches AI Suggestion
               </Typography>
             )}
-            {!matchesAiSuggestion && evaluation && (
+            {hasEdited && (
               <Typography variant="caption" color="text.secondary">
                 Edited from AI Suggestion
               </Typography>
             )}
 
-            <Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Typography variant="caption" color="text.secondary">
                 Final Rating
               </Typography>
               <Rating
                 value={expertRating}
-                onChange={(_, value) => {
-                  setExpertRating(value);
-                  setHasEdited(true);
-                }}
+                onChange={(_, value) => setExpertRating(value)}
                 max={5}
                 precision={1}
                 size="medium"
@@ -290,17 +298,14 @@ const SpanDetails: React.FC<SpanDetailsProps> = ({ span, trace }) => {
 
             <Box>
               <Typography variant="caption" color="text.secondary">
-                Expert Comment
+                Comment
               </Typography>
               <TextField
                 multiline
                 minRows={4}
                 fullWidth
                 value={expertComment}
-                onChange={(e) => {
-                  setExpertComment(e.target.value);
-                  setHasEdited(true);
-                }}
+                onChange={(e) => setExpertComment(e.target.value)}
                 placeholder="Adjust the AI rationale if needed..."
                 sx={{
                   mt: 1,
@@ -318,7 +323,6 @@ const SpanDetails: React.FC<SpanDetailsProps> = ({ span, trace }) => {
               variant="contained"
               onClick={handleSubmit}
               disabled={expertRating === null || submitting}
-              sx={{ mt: "auto" }}
             >
               {submitting ? "Submitting..." : "Verify and Submit"}
             </Button>
@@ -424,7 +428,7 @@ const SpanDetails: React.FC<SpanDetailsProps> = ({ span, trace }) => {
               Submitted
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Expert validation saved successfully.
+              Validation saved successfully.
             </Typography>
           </Box>
         </DialogContent>
