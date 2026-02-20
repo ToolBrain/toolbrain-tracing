@@ -28,6 +28,8 @@ from tracebrain.db.base import (
     ChatMessage,
     TraceStatus,
     CurriculumTask,
+    History,
+    AppSettings,
 )
 
 logger = logging.getLogger(__name__)
@@ -505,7 +507,7 @@ class BaseStorageBackend:
                 session.query(Trace)
                 .options(selectinload(Trace.spans))
                 .filter(Trace.episode_id == episode_id)
-                .order_by(Trace.created_at.desc())
+                .order_by(Trace.created_at.asc())
                 .all()
             )
         finally:
@@ -615,6 +617,38 @@ class BaseStorageBackend:
         except Exception:
             session.rollback()
             logger.exception("Failed to add feedback")
+            raise
+        finally:
+            session.close()
+
+    def get_settings(self) -> Dict[str, Any]:
+        """Return global application settings (singleton row)."""
+        session = self.get_session()
+        try:
+            settings_row = session.query(AppSettings).filter(AppSettings.id == 1).first()
+            if not settings_row or not isinstance(settings_row.config, dict):
+                return {}
+            return dict(settings_row.config)
+        finally:
+            session.close()
+
+    def update_settings(self, new_settings: Dict[str, Any]) -> Dict[str, Any]:
+        """Upsert global application settings and return the updated config."""
+        session = self.get_session()
+        try:
+            settings_row = session.query(AppSettings).filter(AppSettings.id == 1).first()
+            payload = new_settings if isinstance(new_settings, dict) else {}
+            if not settings_row:
+                settings_row = AppSettings(id=1, config=dict(payload))
+                session.add(settings_row)
+            else:
+                existing = settings_row.config if isinstance(settings_row.config, dict) else {}
+                settings_row.config = {**existing, **payload}
+            session.commit()
+            return dict(settings_row.config or {})
+        except Exception:
+            session.rollback()
+            logger.exception("Failed to update settings")
             raise
         finally:
             session.close()
@@ -777,18 +811,70 @@ class BaseStorageBackend:
         finally:
             session.close()
 
-    def add_history():
+    def add_history(self, id: str, type: str) -> None:
         """Add an entry for a trace/episode to users history."""
-        return
-    
-    def get_history():
-        """Return trace/episode entries within history."""
-        return
-    
-    def clear_history():
-        """Empty the complete trace/episode entries history."""
-        return
+        session = self.get_session()
+        try:
+            if type == "trace":
+                exists = session.query(Trace).filter(Trace.id == id).first()
+            elif type == "episode":
+                exists = session.query(Trace).filter(Trace.episode_id == id).first()
+            else:
+                return
 
+            if not exists:
+                return
+
+            existing = session.query(History).filter(History.id == id).first()
+            
+            if existing:
+                existing.last_accessed = datetime.utcnow()
+            else:
+                history_entry = History(
+                    id=id,
+                    type=type,
+                    last_accessed=datetime.utcnow()
+                )
+                session.add(history_entry)
+            
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def get_history(
+        self, 
+        type_filter: str,
+        limit: int = 10, 
+        offset: int = 0,
+        query: Optional[str] = None,
+    ) -> tuple[List[History], int]:
+        """Return trace/episode entries within history."""
+        session = self.get_session()
+        try:
+            q = session.query(History).filter(History.type == type_filter)
+            
+            if query:
+                q = q.filter(History.id.ilike(f"%{query}%"))
+            
+            total = q.count()
+            items = q.order_by(History.last_accessed.desc()).limit(limit).offset(offset).all()
+            
+            return items, total
+        finally:
+            session.close()
+
+    def clear_history(self) -> int:
+        """Empty the complete trace/episode entries history."""
+        session = self.get_session()
+        try:
+            count = session.query(History).delete()
+            session.commit()
+            return count
+        finally:
+            session.close()
 
 class SQLiteBackend(BaseStorageBackend):
     """SQLite storage backend for development and testing."""

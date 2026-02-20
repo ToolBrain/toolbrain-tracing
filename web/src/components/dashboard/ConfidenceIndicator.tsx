@@ -1,17 +1,25 @@
 import React from "react";
-import { Box, LinearProgress, Typography, CircularProgress } from "@mui/material";
+import {
+  Box,
+  LinearProgress,
+  Typography,
+  CircularProgress,
+} from "@mui/material";
 import { CheckCircle, Schedule, VerifiedUser } from "@mui/icons-material";
+import { getConfidenceColor } from "../utils/utils";
 
 interface ConfidenceIndicatorProps {
   confidence?: number | null;
   status?: "pending_review" | "auto_verified" | "completed" | null;
+  isAnalyzing?: boolean;
 }
 
 const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
   confidence,
   status,
+  isAnalyzing = false,
 }) => {
-  if (confidence === undefined || confidence === null) {
+  if (isAnalyzing) {
     return (
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <CircularProgress size={14} thickness={5} />
@@ -22,9 +30,16 @@ const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
     );
   }
 
+  if (confidence === undefined || confidence === null) {
+    return (
+      <Typography variant="body2" color="text.disabled">
+        —
+      </Typography>
+    );
+  }
+
   const percentage = confidence * 100;
-  const progressColor =
-    confidence < 0.2 ? "error" : confidence < 0.8 ? "warning" : "success";
+  const progressColor = getConfidenceColor(confidence);
 
   const resolvedStatus = status ?? "pending_review";
 
