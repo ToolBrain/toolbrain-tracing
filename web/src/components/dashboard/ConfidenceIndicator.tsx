@@ -5,13 +5,15 @@ import { CheckCircle, Schedule, VerifiedUser } from "@mui/icons-material";
 interface ConfidenceIndicatorProps {
   confidence?: number | null;
   status?: "pending_review" | "auto_verified" | "completed" | null;
+  isAnalyzing?: boolean;
 }
 
 const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
   confidence,
   status,
+  isAnalyzing = false,
 }) => {
-  if (confidence === undefined || confidence === null) {
+  if (isAnalyzing) {
     return (
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <CircularProgress size={14} thickness={5} />
@@ -19,6 +21,14 @@ const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
           Analyzing...
         </Typography>
       </Box>
+    );
+  }
+
+  if (confidence === undefined || confidence === null) {
+    return (
+      <Typography variant="body2" color="text.disabled">
+        —
+      </Typography>
     );
   }
 

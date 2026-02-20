@@ -171,6 +171,7 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
               const evaluation = traceGetEvaluation(trace);
               const confidence = evaluation?.confidence;
               const suggestion_status = evaluation?.status;
+              const isAnalyzing = !evaluation;
 
               return (
                 <React.Fragment key={trace.trace_id}>
@@ -257,6 +258,7 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
                       <ConfidenceIndicator
                         confidence={confidence}
                         status={suggestion_status}
+                        isAnalyzing={isAnalyzing}
                       />
                     </TableCell>
                   </TableRow>
