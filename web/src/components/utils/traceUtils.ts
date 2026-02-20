@@ -1,4 +1,5 @@
 import type { Trace } from "../../types/trace";
+import { spanGetUsage } from "./spanUtils";
 
 export function traceGetEpisodeId(trace: Trace) {
   return trace?.attributes["tracebrain.episode.id"];
@@ -53,3 +54,22 @@ export const traceGetStartTime = (trace: Trace): string => {
   }
   return new Date(Math.min(...startTimes)).toISOString();
 };
+
+export const traceGetTotalTokens = (trace: Trace): number | undefined => {
+  if (!trace?.spans?.length) return undefined;
+
+  const totals = trace.spans
+    .map((span) => spanGetUsage(span)?.total_tokens)
+    .filter((t): t is number => typeof t === "number");
+
+  if (!totals.length) return undefined;
+
+  return totals.reduce((sum, t) => sum + t, 0);
+};
+
+export const TRACE_STATUS_PRIORITY = [
+  "failed",
+  "needs_review",
+  "running",
+  "completed",
+];

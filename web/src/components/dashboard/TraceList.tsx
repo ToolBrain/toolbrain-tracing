@@ -16,21 +16,32 @@ import {
   KeyboardArrowDown,
   KeyboardArrowRight,
   Layers,
+  Token,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import type { Trace } from "../../types/trace";
 import React from "react";
-import { spanGetOutput, spanHasError } from "../utils/spanUtils";
-import StatusChip, { ALLOWED_STATUSES, type ChipStatus } from "./StatusChip";
+import {
+  spanGetDuration,
+  spanGetOutput,
+  spanHasError,
+} from "../utils/spanUtils";
+import StatusChip, {
+  ALLOWED_STATUSES,
+  type ChipStatus,
+} from "../shared/StatusChip";
 import {
   traceGetDuration,
   traceGetEvaluation,
   traceGetPriority,
   traceGetStartTime,
   traceGetStatus,
+  traceGetTotalTokens,
 } from "../utils/traceUtils";
 import ConfidenceIndicator from "./ConfidenceIndicator";
+import { formatDateTime, getPriorityColor } from "../utils/utils";
+import TypeChip from "../shared/TypeChip";
 
 interface TraceListProps {
   traces: Trace[];
@@ -39,19 +50,6 @@ interface TraceListProps {
 const TraceList: React.FC<TraceListProps> = ({ traces }) => {
   const nav = useNavigate();
   const [expandedTraces, setExpandedTraces] = useState<Set<string>>(new Set());
-
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
-  };
 
   const getTraceStatus = (trace: Trace): ChipStatus => {
     const status = traceGetStatus(trace);
@@ -111,7 +109,9 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
             <TableCell sx={{ width: "16%", fontWeight: 600 }}>
               Timestamp
             </TableCell>
-            <TableCell sx={{ width: "12%", fontWeight: 600 }}>Type</TableCell>
+            <TableCell sx={{ width: "12%", fontWeight: 600 }}>
+              Details
+            </TableCell>
             <TableCell sx={{ width: "15%", fontWeight: 600 }}>Status</TableCell>
             <TableCell sx={{ width: "15%", fontWeight: 600 }}>
               Duration
@@ -127,7 +127,10 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
         <TableBody>
           {traces.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} sx={{ textAlign: "center", py: 4 }}>
+              <TableCell
+                colSpan={7}
+                sx={{ textAlign: "center", py: 4, color: "text.secondary" }}
+              >
                 No traces found.
               </TableCell>
             </TableRow>
@@ -138,6 +141,7 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
               const duration = traceGetDuration(trace);
               const status = getTraceStatus(trace);
               const priority = traceGetPriority(trace);
+              const totalTokens = traceGetTotalTokens(trace) ?? "N/A";
 
               const evaluation = traceGetEvaluation(trace);
               const confidence = evaluation?.confidence;
@@ -179,28 +183,70 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">Trace</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        <Layers
-                          fontSize="inherit"
-                          sx={{ color: "text.secondary" }}
-                        />
-                        {trace.spans.length}
-                        {"\t"}
-                        <Flag
-                          fontSize="inherit"
-                          sx={{
-                            color:
-                              priority >= 4
-                                ? "error.main" // (4-5) High priority
-                                : priority >= 3
-                                  ? "warning.main" // (3) Medium priority
-                                  : "error.light", // (1-2) Low priority
-                          }}
-                        />
-                        {priority}
-                      </Typography>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 0.5,
+                        }}
+                      >
+                        <TypeChip type="trace" />
+
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          {/* Span Count */}
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.25,
+                            }}
+                          >
+                            <Layers
+                              fontSize="inherit"
+                              sx={{ color: "text.disabled" }}
+                            />
+                            {trace.spans.length}
+                          </Box>
+
+                          {/* Priority */}
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.25,
+                            }}
+                          >
+                            <Flag
+                              fontSize="inherit"
+                              sx={{
+                                color: getPriorityColor(priority),
+                              }}
+                            />
+                            {priority}
+                          </Box>
+
+                          {/* Token Usage */}
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.25,
+                            }}
+                          >
+                            <Token
+                              fontSize="inherit"
+                              sx={{ color: "text.disabled" }}
+                            />
+                            {totalTokens}
+                          </Box>
+                        </Typography>
+                      </Box>
                     </TableCell>
+
                     <TableCell>
                       <StatusChip status={status} />
                     </TableCell>
@@ -234,7 +280,7 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
                   <TableRow>
                     <TableCell sx={{ p: 0, border: 0 }} colSpan={7}>
                       <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                        <Box sx={{ bgcolor: "action.hover", py: 1 }}>
+                        <Box sx={{ bgcolor: "action.hover" }}>
                           <Table
                             size="small"
                             sx={{ width: "100%", tableLayout: "fixed" }}
@@ -250,11 +296,7 @@ const TraceList: React.FC<TraceListProps> = ({ traces }) => {
                             </colgroup>
                             <TableBody>
                               {trace.spans.map((span) => {
-                                const spanDuration = (
-                                  (new Date(span.end_time).getTime() -
-                                    new Date(span.start_time).getTime()) /
-                                  1000
-                                ).toFixed(2);
+                                const spanDuration = spanGetDuration(span);
                                 const spanStatus: "success" | "error" =
                                   spanHasError(span) ? "error" : "success";
 
