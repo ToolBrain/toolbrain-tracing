@@ -75,8 +75,8 @@ const Dashboard: React.FC = () => {
   // Function to fetch the latest traces
   const handleFetchTraces = async () => {
     try {
-      const newTraces = await fetchTraces();
-      if (newTraces) setTraces(newTraces);
+      const data = await fetchTraces();
+      if (data) setTraces(data.traces);
     } catch (error) {
       console.error("Failed to fetch traces:", error);
     }

@@ -48,7 +48,7 @@ const EpisodeRow: React.FC<{ episode: Episode }> = ({ episode }) => {
         onClick={() => nav(`/trace/${episode.episode_id}?type=episode`)}
         sx={{ cursor: "pointer" }}
       >
-        <TableCell sx={{ p: 1 }}>
+        <TableCell>
           <IconButton
             size="small"
             onClick={(e) => {
