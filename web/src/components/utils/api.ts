@@ -116,12 +116,17 @@ export const evaluateTrace = async (id: string, judgeModelId: string) => {
   return response.json();
 };
 
-export const generateCurriculum = async (): Promise<{
+export const generateCurriculum = async (params: {
+  error_types: string[] | null;
+  limit: number;
+}): Promise<{
   status: string;
   tasks_generated: number;
 }> => {
   const response = await fetch("/api/v1/curriculum/generate", {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
   });
   if (!response.ok)
     throw new Error(`Failed to generate curriculum: ${response.status}`);
