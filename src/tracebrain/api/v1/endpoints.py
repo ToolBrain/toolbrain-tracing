@@ -833,11 +833,11 @@ def cleanup_traces(
     ),
 ):
     """Delete traces that match cleanup filters."""
-    if older_than_hours is None and status is None:
-        raise HTTPException(
-            status_code=400,
-            detail="At least one cleanup condition must be provided.",
-        )
+    # if older_than_hours is None and status is None:
+    #     raise HTTPException(
+    #         status_code=400,
+    #         detail="At least one cleanup condition must be provided.",
+    #     )
 
     deleted = store.cleanup_traces(
         older_than_hours=older_than_hours,

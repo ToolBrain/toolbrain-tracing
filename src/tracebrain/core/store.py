@@ -13,7 +13,7 @@ import re
 import json
 
 import sqlparse
-from sqlalchemy import create_engine, func, cast, text, Integer, Float, case
+from sqlalchemy import create_engine, event, func, cast, text, Integer, Float, case
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError, ProgrammingError, TimeoutError
 from sqlalchemy.orm import sessionmaker, Session, selectinload
@@ -67,6 +67,14 @@ class BaseStorageBackend:
             engine_kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
 
         self.engine = create_engine(db_url, **engine_kwargs)
+
+        if self.is_sqlite:
+            @event.listens_for(self.engine, "connect")
+            def set_sqlite_pragma(dbapi_connection, connection_record):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.close()
+                
         self.SessionLocal = sessionmaker(
             bind=self.engine,
             autocommit=False,
@@ -778,8 +786,16 @@ class BaseStorageBackend:
             if status:
                 q = q.filter(Trace.status == status)
 
-            deleted = q.count()
+            # History table cleanup
+            traces_to_delete = q.all()
+            trace_ids = [t.id for t in traces_to_delete]
+            episode_ids = list({t.episode_id for t in traces_to_delete if t.episode_id})
+
+            deleted = len(trace_ids)
             if deleted:
+                session.query(History).filter(History.id.in_(trace_ids)).delete(synchronize_session=False)
+                if episode_ids:
+                    session.query(History).filter(History.id.in_(episode_ids)).delete(synchronize_session=False)
                 q.delete(synchronize_session=False)
                 session.commit()
             return int(deleted)

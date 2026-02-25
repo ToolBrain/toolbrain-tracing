@@ -254,3 +254,21 @@ export const batchEvaluateTraces = async () => {
     throw error;
   }
 };
+
+export const deleteTraces = async (period: string) => {
+  const hoursMap: Record<string, number> = {
+    "1h": 1,
+    "12h": 12,
+    "24h": 24,
+    "7d": 168,
+    "30d": 720,
+  };
+
+  const params = new URLSearchParams();
+  if (period !== "all") {
+    params.set("older_than_hours", String(hoursMap[period]));
+  }
+
+  const res = await fetch(`/api/v1/ops/traces/cleanup?${params}`, { method: "DELETE" });
+  return res.json();
+};
