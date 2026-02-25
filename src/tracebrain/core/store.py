@@ -22,7 +22,6 @@ from tracebrain.config import settings
 from tracebrain.core.services.embedding import EmbeddingFactory
 from tracebrain.db.base import (
     Base,
-    Episode,
     Trace,
     Span,
     ChatSession,
@@ -165,10 +164,6 @@ class BaseStorageBackend:
 
         session = self.get_session()
         try:
-            if episode_id:
-                existing_episode = session.query(Episode).filter(Episode.id == episode_id).first()
-                if not existing_episode:
-                    session.add(Episode(id=episode_id, created_at=datetime.utcnow()))
             session.add(trace)
             session.commit()
             logger.info("Successfully added trace %s with %s spans", trace_id, len(trace.spans))
@@ -1083,14 +1078,19 @@ class BaseStorageBackend:
         """List episodes ordered by creation time with their traces."""
         session = self.get_session()
         try:
-            q = session.query(Episode)
-            if query:
-                q = q.filter(Episode.id.ilike(f"%{query}%"))
+            q = (
+                session.query(
+                    Trace.episode_id.label("id"),
+                    func.min(Trace.created_at).label("created_at"),
+                )
+                .filter(Trace.episode_id.ilike(f"%{query}%") if query else True)
+                .group_by(Trace.episode_id)
+            )
 
             total = q.count()
 
             episodes = (
-                q.order_by(Episode.created_at.desc())
+                q.order_by(text("created_at desc"))
                 .offset(skip)
                 .limit(limit)
                 .all()

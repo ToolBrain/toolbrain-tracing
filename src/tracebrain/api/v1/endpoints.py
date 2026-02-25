@@ -45,7 +45,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from ...core.store import TraceStore
 from ...core.curator import CurriculumCurator
-from ...db.base import Episode, TraceStatus, CurriculumTask, Trace
+from ...db.base import TraceStatus, CurriculumTask, Trace
 from ...evaluators.judge_agent import AIJudge
 from ...core.librarian import LibrarianAgent, LIBRARIAN_AVAILABLE
 from ...config import settings
